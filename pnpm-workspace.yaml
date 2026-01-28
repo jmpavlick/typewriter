@@ -1,3 +1,4 @@
 onlyBuiltDependencies:
   - elm
+  - elm-test-rs
   - esbuild

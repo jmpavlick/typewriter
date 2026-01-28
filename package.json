@@ -13,6 +13,7 @@
   "devDependencies": {
     "elm": "0.19.1-6",
     "elm-codegen": "^0.6.3",
+    "elm-test": "0.19.1-revision17",
     "prettier": "^3.8.1",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

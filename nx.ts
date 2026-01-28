@@ -15,12 +15,14 @@ const simpleObj = z.object({
 
 objSchemas.simpleObj = simpleObj
 
-Array.from(Object.entries(objSchemas)).forEach(([name, sch]) => {
-  const shape = sch.shape
+// Array.from(Object.entries(objSchemas)).forEach(([name, sch]) => {
+//   const shape = sch.shape
 
-  console.log(stringify({ [name]: shape }, null, 2))
-})
+//   console.log(stringify({ [name]: shape }, null, 2))
+// })
 
 const strSch = z.string()
 
-console.log(stringify({ strSch }, null, 2))
+// console.log(stringify({ strSch }, null, 2))
+//
+console.log((stringify(simpleObj.shape, null, 2)))
