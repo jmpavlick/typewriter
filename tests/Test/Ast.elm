@@ -1,4 +1,4 @@
-module Example exposing (suite)
+module Test.Ast exposing (suite)
 
 import Ast exposing (Value(..))
 import Dict
