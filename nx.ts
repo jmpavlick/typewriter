@@ -3,7 +3,7 @@ import stringify from "safe-stable-stringify"
 
 let objSchemas: Record<string, z.ZodObject> = {}
 
-const simpleObj = z.object({
+export const simpleObj = z.object({
   name: z.string(),
   age: z.int(),
   weight: z.number(),
@@ -23,6 +23,5 @@ objSchemas.simpleObj = simpleObj
 
 const strSch = z.string()
 
-// console.log(stringify({ strSch }, null, 2))
-//
-console.log((stringify(simpleObj.shape, null, 2)))
+console.log(stringify(simpleObj, null, 2))
+// console.log((stringify(simpleObj.shape, null, 2)))

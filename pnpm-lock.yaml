@@ -24,6 +24,9 @@ importers:
       elm-test:
         specifier: 0.19.1-revision17
         version: 0.19.1-revision17
+      elm-tooling:
+        specifier: ^1.17.0
+        version: 1.17.0
       prettier:
         specifier: ^3.8.1
         version: 3.8.1
@@ -278,6 +281,10 @@ packages:
   elm-test@0.19.1-revision17:
     resolution: {integrity: sha512-P9J8tXdLXmqgIMlSozfcb/KCORq4GuxfwBbzqFLMss8KlGmUKonOJwseRX6xVkdU5xgGVA/mz9rfMTNomIbwng==}
     engines: {node: '>=12.20.0'}
+    hasBin: true
+
+  elm-tooling@1.17.0:
+    resolution: {integrity: sha512-Y6umJYX7w/tV08pgmNF95nkvPq+xOvhirJz6LIt4YUj2I9V2W0V4Yb1E0IUZ/9X9yUgiEcFpKyObav4QMWCPrg==}
     hasBin: true
 
   elm@0.19.1-6:
@@ -681,6 +688,8 @@ snapshots:
       tinyglobby: 0.2.15
       which: 2.0.2
       xmlbuilder: 15.1.1
+
+  elm-tooling@1.17.0: {}
 
   elm@0.19.1-6:
     optionalDependencies:
