@@ -3,6 +3,7 @@ module Generate exposing (main)
 {-| -}
 
 import Ast exposing (Value(..))
+import Builder
 import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
@@ -29,26 +30,5 @@ main : Program Json.Encode.Value () ()
 main =
     Generate.fromJson argsDecoder
         (\{ outputModulePath, decls } ->
-            let
-                ( mappedDecls, unmappedNames ) =
-                    List.Ext.partitionMap
-                        (\( _, declType ) ->
-                            case declType of
-                                SUnimplemented name ->
-                                    Just name
-
-                                _ ->
-                                    Nothing
-                        )
-                        decls
-            in
-            []
+            List.map (Builder.toFile outputModulePath) decls
         )
-
-
-file : Elm.File
-file =
-    Elm.file [ "HelloWorld" ]
-        [ Elm.declaration "hello"
-            (Elm.string "World!")
-        ]

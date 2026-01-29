@@ -1,13 +1,33 @@
-module Ast exposing (Decl, Props, Value(..), decoder, map, optMap)
+module Ast exposing
+    ( Decl, Value(..)
+    , decoder
+    , Props, map
+    , Attr, optMap, onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
+    )
+
+{-|
+
+@docs Decl, Value
+@docs decoder
+@docs Props, map
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
+
+-}
 
 import Dict exposing (Dict)
 import Json.Decode as D exposing (Decoder)
 
 
+
+-- TYPES
+
+
+{-| -}
 type alias Decl =
     ( String, Value )
 
 
+{-| -}
 type Value
     = SString
     | SInt
@@ -20,6 +40,7 @@ type Value
     | SUnimplemented String
 
 
+{-| -}
 type alias Props a =
     { sString : () -> a
     , sInt : () -> a
@@ -33,6 +54,11 @@ type alias Props a =
     }
 
 
+
+-- MAPS
+
+
+{-| -}
 map : Props a -> Value -> a
 map props value =
     case value of
@@ -64,10 +90,12 @@ map props value =
             props.sUnimplemented str
 
 
+{-| -}
 type alias Attr a =
     Props (Maybe a) -> Props (Maybe a)
 
 
+{-| -}
 optMap : List (Attr a) -> Value -> Maybe a
 optMap attrs =
     let
@@ -88,6 +116,65 @@ optMap attrs =
         (List.foldl (<|) base attrs)
 
 
+{-| -}
+onString : a -> Attr a
+onString value base =
+    { base | sString = \() -> Just value }
+
+
+{-| -}
+onInt : a -> Attr a
+onInt value base =
+    { base | sInt = \() -> Just value }
+
+
+{-| -}
+onFloat : a -> Attr a
+onFloat value base =
+    { base | sFloat = \() -> Just value }
+
+
+{-| -}
+onBool : a -> Attr a
+onBool value base =
+    { base | sBool = \() -> Just value }
+
+
+{-| -}
+onOptional : (Value -> a) -> Attr a
+onOptional fn base =
+    { base | sOptional = \v -> Just <| fn v }
+
+
+{-| -}
+onNullable : (Value -> a) -> Attr a
+onNullable fn base =
+    { base | sNullable = \v -> Just <| fn v }
+
+
+{-| -}
+onArray : (Value -> a) -> Attr a
+onArray fn base =
+    { base | sArray = \v -> Just <| fn v }
+
+
+{-| -}
+onObject : (Dict String Value -> a) -> Attr a
+onObject fn base =
+    { base | sObject = \dict -> Just <| fn dict }
+
+
+{-| -}
+onUnimplemented : (String -> a) -> Attr a
+onUnimplemented fn base =
+    { base | sUnimplemented = \str -> Just <| fn str }
+
+
+
+-- JSON
+
+
+{-| -}
 decoder : Decoder Value
 decoder =
     D.lazy (always decodeHelp)

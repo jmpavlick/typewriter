@@ -1,7 +1,7 @@
 import "./lib/serializeErrorPrototype.js"
 import stringify from "safe-stable-stringify"
 import stringifyOrElse from "./lib/stringifyOrElse.js"
-import { type ResultAsync, okAsync, errAsync, fromPromise, Result } from "neverthrow"
+import { type ResultAsync, okAsync, errAsync, fromPromise, Result, ok } from "neverthrow"
 import dedent from "dedent"
 import z from "zod"
 import zx from "./lib/zod/ext.js"
@@ -47,16 +47,19 @@ const toConfig = ({
   root,
   relativeInputPath,
   elmCodegenParams,
+  cleanFirst,
 }: {
   root: string
   relativeInputPath: string
   elmCodegenParams: ElmCodegenParams
+  cleanFirst: boolean
 }) => {
   const input = toInput(root)(relativeInputPath)
   return {
     workdirPath: toWorkdirPath(root),
     input,
     elmCodegenConfig: toElmCodegenConfig(elmCodegenParams)(root),
+    cleanFirst,
   }
 }
 
@@ -68,6 +71,7 @@ const config = toConfig({
     relativeOutdir: "./generated",
     debug: true,
   },
+  cleanFirst: true,
 })
 
 export type Config = ReturnType<typeof toConfig>
@@ -109,9 +113,18 @@ const toElmCodegenInput =
 
 // run elm-codegen
 const toElmCodegenExec =
-  ({ debug, cwd, generatorModulePath, outdir }: ElmCodegenConfig) =>
+  ({ debug, cwd, generatorModulePath, outdir }: ElmCodegenConfig, cleanFirst: boolean) =>
   (input: { outputModulePath: string[]; decls: ZodDecls }) =>
     okAsync()
+      .andThrough(() => {
+        if (cleanFirst) {
+          return okAsync().andThen(
+            Result.fromThrowable(() => fs.rmSync(outdir, { recursive: true, force: true }))
+          )
+        }
+
+        return okAsync()
+      })
       .andThrough(Result.fromThrowable(() => fs.mkdirSync(outdir, { recursive: true })))
       .andThen(
         Result.fromThrowable(() =>
@@ -129,7 +142,7 @@ const run = (config: Config) =>
   read(config.input.path)
     .andThen(toZodSchemas)
     .map(toElmCodegenInput(config.input.rel))
-    .andThen(toElmCodegenExec(config.elmCodegenConfig))
+    .andThen(toElmCodegenExec(config.elmCodegenConfig, config.cleanFirst))
 
 // for dev testing, just do it
 run(config)

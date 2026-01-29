@@ -1,6 +1,11 @@
 module List.Ext exposing (..)
 
 
+concatAp : a -> List (a -> List b) -> List b
+concatAp a fns =
+    List.concatMap ((|>) a) fns
+
+
 partitionMap : (a -> Maybe b) -> List a -> ( List a, List b )
 partitionMap fn list =
     (\( aVs, bVs ) ->
