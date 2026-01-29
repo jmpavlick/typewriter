@@ -10,7 +10,12 @@ import String.Extra
 toTypeAnnotation : () -> Ast.Value -> Type.Annotation
 toTypeAnnotation () =
     Maybe.withDefault (Type.named [] "Never")
-        << Ast.optMap []
+        << Ast.optMap toTypeAnnotationOpts
+
+
+toTypeAnnotationOpts : List (Ast.Attr Type.Annotation)
+toTypeAnnotationOpts =
+    []
 
 
 toTypeDecl : Ast.Value -> Elm.Declaration
