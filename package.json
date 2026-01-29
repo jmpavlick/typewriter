@@ -20,6 +20,8 @@
     "typescript": "^5.9.3"
   },
   "dependencies": {
+    "dedent": "^1.7.1",
+    "neverthrow": "^8.2.0",
     "safe-stable-stringify": "^2.5.0",
     "zod": "^4.3.6"
   }
