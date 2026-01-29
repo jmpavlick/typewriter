@@ -4,13 +4,21 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "pnpm test:watch",
+    "test:elm": "elm-test && test:ts",
+    "test:elm:watch": "elm-test --watch",
+    "test:ts": "tsx main.ts",
+    "test:ts:watch": "chokidar \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
+    "test:watch": "concurrently \"pnpm test:elm:watch\" \"pnpm test:ts:watch\""
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.10.0",
   "devDependencies": {
+    "@types/node": "^25.1.0",
+    "chokidar": "^5.0.0",
+    "concurrently": "^9.2.1",
     "elm": "0.19.1-6",
     "elm-codegen": "^0.6.3",
     "elm-test": "0.19.1-revision17",
