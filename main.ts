@@ -8,6 +8,8 @@ import zx from "./lib/zod/ext.js"
 import { ternary } from "./lib/neverthrow/ext.js"
 import * as fs from "fs"
 import { dirname } from "path"
+import * as ElmCodegen from "elm-codegen"
+import { relative } from "path/win32"
 
 // eventually, make this stuff configurable
 const ROOT = `.`
@@ -21,19 +23,52 @@ const toInput = (root: string) => (relInputPath: string) => ({
   rel: relInputPath,
 })
 
-const toOutfileCodegenInput = (root: string) => (input: { rel: string }) =>
-  `${toWorkdirPath(root)}/${input.rel}.json`
+const toElmCodegenConfig =
+  ({
+    relativeGeneratorModulePath,
+    relativeOutdir,
+    debug,
+  }: {
+    relativeGeneratorModulePath: string
+    relativeOutdir: string
+    debug: boolean
+  }) =>
+  (root: string) => ({
+    cwd: `${root}`,
+    generatorModulePath: `${root}/${relativeGeneratorModulePath}`,
+    outdir: `${root}/${relativeOutdir}`,
+    debug,
+  })
 
-const toConfig = (root: string, relativeInputPath: string) => {
+type ElmCodegenConfig = ReturnType<ReturnType<typeof toElmCodegenConfig>>
+type ElmCodegenParams = Parameters<typeof toElmCodegenConfig>[0]
+
+const toConfig = ({
+  root,
+  relativeInputPath,
+  elmCodegenParams,
+}: {
+  root: string
+  relativeInputPath: string
+  elmCodegenParams: ElmCodegenParams
+}) => {
   const input = toInput(root)(relativeInputPath)
   return {
     workdirPath: toWorkdirPath(root),
     input,
-    outfileCodegenInputPath: toOutfileCodegenInput(root)(input),
+    elmCodegenConfig: toElmCodegenConfig(elmCodegenParams)(root),
   }
 }
 
-const config = toConfig(".", "tests/schemaVariants.ts")
+const config = toConfig({
+  root: ".",
+  relativeInputPath: "tests/schemaVariants.ts",
+  elmCodegenParams: {
+    relativeGeneratorModulePath: "codegen/Generate.elm",
+    relativeOutdir: "./generated",
+    debug: true,
+  },
+})
 
 export type Config = ReturnType<typeof toConfig>
 
@@ -47,13 +82,7 @@ const read = (filepath: string): ResultAsync<Record<string, unknown>, unknown> =
 // transform the module-object to zod schemas
 const zodDeclsSchema = z.record(
   z.string(),
-  z.custom<z.ZodType>(
-    (v) => {
-      // console.log(v)
-      return v instanceof z.ZodType
-    },
-    { error: "Value must be a Zod schema" }
-  )
+  z.custom<z.ZodType>((v) => v instanceof z.ZodType, { error: "Value must be a Zod schema" })
 )
 
 type ZodDecls = z.infer<typeof zodDeclsSchema>
@@ -63,27 +92,30 @@ const toZodSchemas = (module: unknown): ResultAsync<ZodDecls, unknown> =>
     .whenFalse(errAsync(`Dynamic import failed; module contains no exports`))(module)
     .andThen(zx.parseResultAsync(zodDeclsSchema))
 
-// get the girl, put the girl in the barn
-// (the american dream)
-const toCodgenInputFile = (path: string) => (zds: ZodDecls) =>
-  stringifyOrElse(zds, null, 2)
-    .andTee((v) => console.log(v))
-    .andThrough(() =>
-      Result.fromThrowable(() => fs.mkdirSync(dirname(path), { recursive: true }))()
-    )
-    .andThen(Result.fromThrowable((str) => fs.writeFileSync(path, str)))
+// run elm-codegen
+const toElmCodegenExec =
+  ({ debug, cwd, generatorModulePath, outdir }: ElmCodegenConfig) =>
+  (input: ZodDecls) =>
+    okAsync()
+      .andThrough(Result.fromThrowable(() => fs.mkdirSync(outdir, { recursive: true })))
+      .andThen(
+        Result.fromThrowable(() =>
+          ElmCodegen.run(generatorModulePath, {
+            debug,
+            output: outdir,
+            flags: input as unknown as any,
+            cwd,
+          })
+        )
+      )
 
 // the chain that fleetwood mac said they'd never break
 const run = (config: Config) =>
-  read(config.input.path)
-    .andThen(toZodSchemas)
-    .andThen(toCodgenInputFile(config.outfileCodegenInputPath))
+  read(config.input.path).andThen(toZodSchemas).andThen(toElmCodegenExec(config.elmCodegenConfig))
 
 // for dev testing, just do it
 run(config)
   .andTee((output) => {
-    console.log(stringify(output, null, 2))
-    console.log()
     console.log("OK")
   })
   .orTee((output) => {

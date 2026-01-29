@@ -17,6 +17,7 @@ type Value
     | SNullable Value
     | SArray Value
     | SObject (Dict String Value)
+    | SUnimplemented String
 
 
 decoder : Decoder Value
@@ -65,5 +66,5 @@ decodeHelp =
                             D.field "element" decoder
 
                     _ ->
-                        D.fail <| "Unknown value for `type` field: " ++ type_
+                        D.succeed <| SUnimplemented type_
             )
