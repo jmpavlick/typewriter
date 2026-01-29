@@ -34,9 +34,9 @@ const toElmCodegenConfig =
     debug: boolean
   }) =>
   (root: string) => ({
-    cwd: `${root}`,
-    generatorModulePath: `${root}/${relativeGeneratorModulePath}`,
-    outdir: `${root}/${relativeOutdir}`,
+    cwd: root,
+    generatorModulePath: relativeGeneratorModulePath,
+    outdir: relativeOutdir,
     debug,
   })
 
@@ -92,10 +92,25 @@ const toZodSchemas = (module: unknown): ResultAsync<ZodDecls, unknown> =>
     .whenFalse(errAsync(`Dynamic import failed; module contains no exports`))(module)
     .andThen(zx.parseResultAsync(zodDeclsSchema))
 
+const toElmCodegenInput =
+  (relativeInputPath: string) =>
+  (zsd: ZodDecls): { outputModulePath: string[]; decls: ZodDecls } => {
+    const outputModulePath = relativeInputPath
+      .split(".")[0]
+      .split("/")
+      .map((chunk) => {
+        const [c, ...hunk] = chunk
+
+        return `${c.toUpperCase()}${hunk.join("").toLowerCase()}`
+      })
+
+    return { outputModulePath, decls: zsd }
+  }
+
 // run elm-codegen
 const toElmCodegenExec =
   ({ debug, cwd, generatorModulePath, outdir }: ElmCodegenConfig) =>
-  (input: ZodDecls) =>
+  (input: { outputModulePath: string[]; decls: ZodDecls }) =>
     okAsync()
       .andThrough(Result.fromThrowable(() => fs.mkdirSync(outdir, { recursive: true })))
       .andThen(
@@ -111,7 +126,10 @@ const toElmCodegenExec =
 
 // the chain that fleetwood mac said they'd never break
 const run = (config: Config) =>
-  read(config.input.path).andThen(toZodSchemas).andThen(toElmCodegenExec(config.elmCodegenConfig))
+  read(config.input.path)
+    .andThen(toZodSchemas)
+    .map(toElmCodegenInput(config.input.rel))
+    .andThen(toElmCodegenExec(config.elmCodegenConfig))
 
 // for dev testing, just do it
 run(config)
