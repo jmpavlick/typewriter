@@ -71,7 +71,7 @@ const config = toConfig({
     relativeOutdir: "./generated",
     debug: true,
   },
-  cleanFirst: true,
+  cleanFirst: false,
 })
 
 export type Config = ReturnType<typeof toConfig>
