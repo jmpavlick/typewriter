@@ -101,7 +101,7 @@ const toElmCodegenInput =
       .map((chunk) => {
         const [c, ...hunk] = chunk
 
-        return `${c.toUpperCase()}${hunk.join("").toLowerCase()}`
+        return `${c.toUpperCase()}${hunk.join("")}`
       })
 
     return { outputModulePath, decls: zsd }

@@ -9,6 +9,7 @@ import Elm.Annotation as Type
 import Gen.CodeGen.Generate as Generate
 import Json.Decode as D
 import Json.Encode
+import List.Ext
 
 
 type alias Args =
@@ -29,8 +30,17 @@ main =
     Generate.fromJson argsDecoder
         (\{ outputModulePath, decls } ->
             let
-                _ =
-                    Debug.log "outputModulePath" outputModulePath
+                ( mappedDecls, unmappedNames ) =
+                    List.Ext.partitionMap
+                        (\( _, declType ) ->
+                            case declType of
+                                SUnimplemented name ->
+                                    Just name
+
+                                _ ->
+                                    Nothing
+                        )
+                        decls
             in
             []
         )
