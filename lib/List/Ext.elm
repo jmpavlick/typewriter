@@ -23,3 +23,22 @@ partitionMap fn list =
             )
             ( [], [] )
             list
+
+
+partitionMapResult : (a -> Result b c) -> List a -> ( List b, List c )
+partitionMapResult fn list =
+    (\( bVs, cVs ) ->
+        ( List.reverse bVs, List.reverse cVs )
+    )
+    <|
+        List.foldl
+            (\step ( accBs, accCs ) ->
+                case fn step of
+                    Err b ->
+                        ( b :: accBs, accCs )
+
+                    Ok c ->
+                        ( accBs, c :: accCs )
+            )
+            ( [], [] )
+            list

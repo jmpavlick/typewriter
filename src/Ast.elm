@@ -141,33 +141,33 @@ onBool value base =
 
 
 {-| -}
-onOptional : (Value -> a) -> Attr a
+onOptional : (Value -> Maybe a) -> Attr a
 onOptional fn base =
-    { base | sOptional = \v -> Just <| fn v }
+    { base | sOptional = \v -> fn v }
 
 
 {-| -}
-onNullable : (Value -> a) -> Attr a
+onNullable : (Value -> Maybe a) -> Attr a
 onNullable fn base =
-    { base | sNullable = \v -> Just <| fn v }
+    { base | sNullable = \v -> fn v }
 
 
 {-| -}
-onArray : (Value -> a) -> Attr a
+onArray : (Value -> Maybe a) -> Attr a
 onArray fn base =
-    { base | sArray = \v -> Just <| fn v }
+    { base | sArray = \v -> fn v }
 
 
 {-| -}
-onObject : (Dict String Value -> a) -> Attr a
+onObject : (Dict String Value -> Maybe a) -> Attr a
 onObject fn base =
-    { base | sObject = \dict -> Just <| fn dict }
+    { base | sObject = \dict -> fn dict }
 
 
 {-| -}
-onUnimplemented : (String -> a) -> Attr a
+onUnimplemented : (String -> Maybe a) -> Attr a
 onUnimplemented fn base =
-    { base | sUnimplemented = \str -> Just <| fn str }
+    { base | sUnimplemented = \str -> fn str }
 
 
 

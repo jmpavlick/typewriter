@@ -11,6 +11,7 @@ import Gen.CodeGen.Generate as Generate
 import Json.Decode as D
 import Json.Encode
 import List.Ext
+import Maybe.Extra
 
 
 type alias Args =
@@ -30,5 +31,25 @@ main : Program Json.Encode.Value () ()
 main =
     Generate.fromJson argsDecoder
         (\{ outputModulePath, decls } ->
-            List.map (Builder.toFile outputModulePath) decls
+            let
+                outputs =
+                    List.map (Builder.build outputModulePath) decls
+
+                files =
+                    Maybe.Extra.values <|
+                        List.map Tuple.second outputs
+
+                errs =
+                    List.map Tuple.first outputs
+
+                _ =
+                    (if List.length errs > 0 then
+                        Debug.log "errors"
+
+                     else
+                        identity
+                    )
+                        errs
+            in
+            files
         )

@@ -8,9 +8,16 @@ import List.Ext
 import String.Extra
 
 
-toTypeAnnotation : () -> Ast.Value -> Type.Annotation
+
+-- toTypeAnnotation_ : () -> Ast.Value -> Type.Annotation
+-- toTypeAnnotation_ () =
+--     Maybe.withDefault (Type.named [] "Never")
+--         << Ast.optMap (toTypeAnnotationOpts ())
+
+
+toTypeAnnotation : () -> Ast.Value -> Result String Type.Annotation
 toTypeAnnotation () =
-    Maybe.withDefault (Type.named [] "Never")
+    Result.fromMaybe "No type mapped for this AST value"
         << Ast.optMap (toTypeAnnotationOpts ())
 
 
@@ -21,18 +28,25 @@ toTypeAnnotationOpts _ =
         isOptional v =
             Maybe.withDefault False <|
                 Ast.optMap
-                    [ Ast.onNullable (always True)
-                    , Ast.onOptional (always True)
+                    [ Ast.onNullable (always <| Just True)
+                    , Ast.onOptional (always <| Just True)
                     ]
                     v
 
-        lookaheadOnOptional : Ast.Value -> Type.Annotation
+        lookaheadOnOptional : Ast.Value -> Maybe Type.Annotation
         lookaheadOnOptional next =
-            if isOptional next then
-                toTypeAnnotation () next
+            case toTypeAnnotation () next of
+                Err _ ->
+                    Nothing
 
-            else
-                Type.maybe <| toTypeAnnotation () next
+                Ok nextAnnotation ->
+                    Just
+                        (if isOptional next then
+                            nextAnnotation
+
+                         else
+                            Type.maybe <| nextAnnotation
+                        )
     in
     [ Ast.onString Type.string
     , Ast.onInt Type.int
@@ -40,28 +54,43 @@ toTypeAnnotationOpts _ =
     , Ast.onFloat Type.float
     , Ast.onOptional (\next -> lookaheadOnOptional next)
     , Ast.onNullable (\next -> lookaheadOnOptional next)
-    , Ast.onArray (\next -> Type.list <| toTypeAnnotation () next)
+    , Ast.onArray (\next -> Result.toMaybe <| Result.map Type.list <| toTypeAnnotation () next)
     , Ast.onObject
         (\dict ->
-            Type.record <|
-                Dict.toList <|
-                    Dict.map
-                        (\_ typedef ->
-                            toTypeAnnotation () typedef
-                        )
-                        dict
+            Just <|
+                Type.record <|
+                    List.map (Tuple.mapSecond (Result.withDefault (Type.named [] "Never"))) <|
+                        Dict.toList <|
+                            Dict.map
+                                (\_ typedef ->
+                                    toTypeAnnotation () typedef
+                                )
+                                dict
         )
     ]
 
 
-toTypeDecl : Ast.Value -> Elm.Declaration
+toTypeDecl : Ast.Value -> Result String Elm.Declaration
 toTypeDecl typedef =
-    Elm.alias "Value" <| toTypeAnnotation () typedef
+    Result.map (Elm.alias "Value") <| toTypeAnnotation () typedef
 
 
-toFile : List String -> Ast.Decl -> Elm.File
-toFile path ( moduleName, typedef ) =
-    Elm.file (List.map (String.Extra.toTitleCase << String.Extra.camelize) <| List.concat [ path, [ moduleName ] ]) <|
-        List.Ext.concatAp typedef
-            [ toTypeDecl >> List.singleton
-            ]
+build : List String -> Ast.Decl -> ( ( String, List String ), Maybe Elm.File )
+build path ( moduleName, typedef ) =
+    let
+        ( errs, decls ) =
+            List.Ext.partitionMapResult identity <|
+                List.Ext.concatAp typedef
+                    [ toTypeDecl >> List.singleton
+                    ]
+
+        buildFile =
+            Elm.file (List.map (String.Extra.toTitleCase << String.Extra.camelize) <| List.concat [ path, [ moduleName ] ])
+    in
+    ( ( moduleName, errs )
+    , if List.length decls == 0 then
+        Nothing
+
+      else
+        Just <| buildFile decls
+    )
