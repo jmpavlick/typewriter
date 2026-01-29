@@ -71,7 +71,7 @@ const config = toConfig({
     relativeOutdir: "./generated",
     debug: true,
   },
-  cleanFirst: false,
+  cleanFirst: true,
 })
 
 export type Config = ReturnType<typeof toConfig>
@@ -119,7 +119,9 @@ const toElmCodegenExec =
       .andThrough(() => {
         if (cleanFirst) {
           return okAsync().andThen(
-            Result.fromThrowable(() => fs.rmSync(outdir, { recursive: true, force: true }))
+            Result.fromThrowable(() =>
+              fs.rmSync(`${outdir}/*.elm`, { recursive: true, force: true })
+            )
           )
         }
 
