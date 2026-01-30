@@ -7,6 +7,7 @@ import Builder
 import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
+import Elm.Declare
 import Gen.CodeGen.Generate as Generate
 import Json.Decode as D
 import Json.Encode
@@ -42,6 +43,26 @@ main =
                 errs =
                     List.map Tuple.first outputs
 
+                errModule =
+                    (\f ->
+                        if List.length errs > 0 then
+                            Just f
+
+                        else
+                            Nothing
+                    )
+                    <|
+                        Elm.file
+                            (outputModulePath ++ [ "AaaaaaaaaErrors" ])
+                        <|
+                            List.map
+                                (\( typeName, messages ) ->
+                                    Elm.declaration typeName <|
+                                        Elm.list <|
+                                            List.map Elm.string messages
+                                )
+                                errs
+
                 _ =
                     (if List.length errs > 0 then
                         Debug.log "errors"
@@ -51,5 +72,5 @@ main =
                     )
                         errs
             in
-            files
+            files ++ Maybe.Extra.toList errModule
         )
