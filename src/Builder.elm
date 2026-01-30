@@ -5,9 +5,9 @@ import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
 import Elm.Ext exposing (pipeline)
-import Endo exposing (Endo)
 import Gen.Json.Decode as GD
 import Gen.Json.Decode.Ext as GDE
+import Gen.Json.Encode as GE
 import List.Ext
 import String.Extra
 
@@ -48,6 +48,7 @@ typeAnnotationAttrs =
     , Ast.onInt Type.int
     , Ast.onFloat Type.float
     , Ast.onBool Type.bool
+    , Ast.onAny GE.annotation_.value
     , Ast.onNullableOrOptionalFlat Type.maybe
     , Ast.onArray (always (Maybe.map Type.list))
     , Ast.onObject
@@ -85,6 +86,7 @@ decoderExprAttrs =
     , Ast.onInt GD.int
     , Ast.onFloat GD.float
     , Ast.onBool GD.bool
+    , Ast.onAny GD.value
     , Ast.onNullableOrOptionalFlat
         (\dec ->
             GD.oneOf

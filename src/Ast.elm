@@ -2,7 +2,7 @@ module Ast exposing
     ( Decl, Value(..)
     , decoder
     , Props
-    , Attr, onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Attr, onString, onInt, onFloat, onBool, onAny, onOptional, onNullable, onArray, onObject, onUnimplemented
     , onNullableOrOptionalFlat, optPara, para
     )
 
@@ -11,7 +11,7 @@ module Ast exposing
 @docs Decl, Value
 @docs decoder
 @docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
 
 -}
 
@@ -34,6 +34,7 @@ type Value
     | SInt
     | SFloat
     | SBool
+    | SAny
     | SOptional Value
     | SNullable Value
     | SArray Value
@@ -48,6 +49,7 @@ type alias Props a =
     , sInt : a
     , sFloat : a
     , sBool : a
+    , sAny : a
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
@@ -72,6 +74,9 @@ para props value =
 
         SBool ->
             props.sBool
+
+        SAny ->
+            props.sAny
 
         SOptional inner ->
             props.sOptional inner (para props inner)
@@ -110,6 +115,7 @@ optPara attrs =
             , sInt = Nothing
             , sFloat = Nothing
             , sBool = Nothing
+            , sAny = Nothing
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
@@ -142,6 +148,12 @@ onFloat value base =
 onBool : a -> Attr a
 onBool value base =
     { base | sBool = Just value }
+
+
+{-| -}
+onAny : a -> Attr a
+onAny value base =
+    { base | sAny = Just value }
 
 
 {-| -}
@@ -239,6 +251,9 @@ decodeHelp =
 
                     "boolean" ->
                         D.succeed SBool
+
+                    "any" ->
+                        D.succeed SAny
 
                     "optional" ->
                         D.map SOptional <|
