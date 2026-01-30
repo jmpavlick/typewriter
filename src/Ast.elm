@@ -1,7 +1,7 @@
 module Ast exposing
     ( Decl, Value(..)
     , decoder
-    , onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , onString_deprecated, onInt_deprecated, onFloat_deprecated, onBool_deprecated, onOptional_deprecated, onNullable_deprecated, onArray_deprecated, onObject_deprecated, onUnimplemented_deprecated
     , Attr_Deprecated, Props_Deprecated, map_deprecated, optMap_deprecated
     )
 
@@ -187,56 +187,56 @@ optMap_deprecated attrs =
 
 
 {-| -}
-onString : a -> Attr_Deprecated a
-onString value base =
+onString_deprecated : a -> Attr_Deprecated a
+onString_deprecated value base =
     { base | sString = \() -> Just value }
 
 
 {-| -}
-onInt : a -> Attr_Deprecated a
-onInt value base =
+onInt_deprecated : a -> Attr_Deprecated a
+onInt_deprecated value base =
     { base | sInt = \() -> Just value }
 
 
 {-| -}
-onFloat : a -> Attr_Deprecated a
-onFloat value base =
+onFloat_deprecated : a -> Attr_Deprecated a
+onFloat_deprecated value base =
     { base | sFloat = \() -> Just value }
 
 
 {-| -}
-onBool : a -> Attr_Deprecated a
-onBool value base =
+onBool_deprecated : a -> Attr_Deprecated a
+onBool_deprecated value base =
     { base | sBool = \() -> Just value }
 
 
 {-| -}
-onOptional : (Value -> Maybe a) -> Attr_Deprecated a
-onOptional fn base =
+onOptional_deprecated : (Value -> Maybe a) -> Attr_Deprecated a
+onOptional_deprecated fn base =
     { base | sOptional = \v -> fn v }
 
 
 {-| -}
-onNullable : (Value -> Maybe a) -> Attr_Deprecated a
-onNullable fn base =
+onNullable_deprecated : (Value -> Maybe a) -> Attr_Deprecated a
+onNullable_deprecated fn base =
     { base | sNullable = \v -> fn v }
 
 
 {-| -}
-onArray : (Value -> Maybe a) -> Attr_Deprecated a
-onArray fn base =
+onArray_deprecated : (Value -> Maybe a) -> Attr_Deprecated a
+onArray_deprecated fn base =
     { base | sArray = \v -> fn v }
 
 
 {-| -}
-onObject : (Dict String Value -> Maybe a) -> Attr_Deprecated a
-onObject fn base =
+onObject_deprecated : (Dict String Value -> Maybe a) -> Attr_Deprecated a
+onObject_deprecated fn base =
     { base | sObject = \dict -> fn dict }
 
 
 {-| -}
-onUnimplemented : (String -> Maybe a) -> Attr_Deprecated a
-onUnimplemented fn base =
+onUnimplemented_deprecated : (String -> Maybe a) -> Attr_Deprecated a
+onUnimplemented_deprecated fn base =
     { base | sUnimplemented = \str -> fn str }
 
 

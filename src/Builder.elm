@@ -28,8 +28,8 @@ toTypeAnnotationOpts _ =
         isOptional v =
             Maybe.withDefault False <|
                 Ast.optMap_deprecated
-                    [ Ast.onNullable (always <| Just True)
-                    , Ast.onOptional (always <| Just True)
+                    [ Ast.onNullable_deprecated (always <| Just True)
+                    , Ast.onOptional_deprecated (always <| Just True)
                     ]
                     v
 
@@ -48,14 +48,14 @@ toTypeAnnotationOpts _ =
                             Type.maybe <| nextAnnotation
                         )
     in
-    [ Ast.onString Type.string
-    , Ast.onInt Type.int
-    , Ast.onBool Type.bool
-    , Ast.onFloat Type.float
-    , Ast.onOptional (\next -> lookaheadOnOptional next)
-    , Ast.onNullable (\next -> lookaheadOnOptional next)
-    , Ast.onArray (\next -> Result.toMaybe <| Result.map Type.list <| toTypeAnnotation () next)
-    , Ast.onObject
+    [ Ast.onString_deprecated Type.string
+    , Ast.onInt_deprecated Type.int
+    , Ast.onBool_deprecated Type.bool
+    , Ast.onFloat_deprecated Type.float
+    , Ast.onOptional_deprecated (\next -> lookaheadOnOptional next)
+    , Ast.onNullable_deprecated (\next -> lookaheadOnOptional next)
+    , Ast.onArray_deprecated (\next -> Result.toMaybe <| Result.map Type.list <| toTypeAnnotation () next)
+    , Ast.onObject_deprecated
         (\dict ->
             Just <|
                 Type.record <|
