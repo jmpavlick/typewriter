@@ -10,32 +10,48 @@ import String.Extra
 
 collapseOptionals : Ast.Value -> Ast.Value
 collapseOptionals value =
-    case value of
-        SOptional (SOptional inner) ->
-            collapseOptionals (SOptional inner)
+    Maybe.withDefault value <|
+        Ast.optCata
+            [ Ast.onString SString
+            , Ast.onInt SInt
+            , Ast.onFloat SFloat
+            , Ast.onBool SBool
+            , Ast.onOptional
+                (\maybeInner ->
+                    Maybe.andThen
+                        (\inner ->
+                            case inner of
+                                SOptional _ ->
+                                    Just inner
 
-        SOptional (SNullable inner) ->
-            collapseOptionals (SOptional inner)
+                                SNullable _ ->
+                                    Just inner
 
-        SNullable (SOptional inner) ->
-            collapseOptionals (SNullable inner)
+                                _ ->
+                                    Just (SOptional inner)
+                        )
+                        maybeInner
+                )
+            , Ast.onNullable
+                (\maybeInner ->
+                    Maybe.andThen
+                        (\inner ->
+                            case inner of
+                                SOptional _ ->
+                                    Just inner
 
-        SNullable (SNullable inner) ->
-            collapseOptionals (SNullable inner)
+                                SNullable _ ->
+                                    Just inner
 
-        SOptional inner ->
-            SOptional (collapseOptionals inner)
-
-        SNullable inner ->
-            SNullable (collapseOptionals inner)
-
-        SArray inner ->
-            SArray (collapseOptionals inner)
-
-        SObject dict ->
-            SObject (Dict.map (\_ v -> collapseOptionals v) dict)
-
-        _ ->
+                                _ ->
+                                    Just (SNullable inner)
+                        )
+                        maybeInner
+                )
+            , Ast.onArray (Maybe.map SArray)
+            , Ast.onObject (Maybe.map SObject)
+            , Ast.onUnimplemented (Just << SUnimplemented)
+            ]
             value
 
 
