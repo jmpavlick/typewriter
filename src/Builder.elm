@@ -39,18 +39,19 @@ build path ( moduleName, typedef ) =
 -- TYPE DECLARATIONS
 
 
-typeAnnotationAttrs : List (Ast.Attr Type.Annotation)
+typeAnnotationAttrs : List (Ast.AttrP Type.Annotation)
 typeAnnotationAttrs =
-    [ Ast.onString Type.string
-    , Ast.onInt Type.int
-    , Ast.onFloat Type.float
-    , Ast.onBool Type.bool
-    , Ast.onOptional (Maybe.map Type.maybe)
-    , Ast.onNullable (Maybe.map Type.maybe)
-    , Ast.onArray (Maybe.map Type.list)
-    , Ast.onObject
+    [ Ast.onStringP Type.string
+    , Ast.onIntP Type.int
+    , Ast.onFloatP Type.float
+    , Ast.onBoolP Type.bool
+    , Ast.onOptionalP (\( _, maybeAnnotation ) -> Maybe.map Type.maybe maybeAnnotation)
+    , Ast.onNullableP (\( _, maybeAnnotation ) -> Maybe.map Type.maybe maybeAnnotation)
+    , Ast.onArrayP (\( _, maybeAnnotation ) -> Maybe.map Type.list maybeAnnotation)
+    , Ast.onObjectP
         (\dict ->
             dict
+                |> Dict.map (\_ ( _, maybeAnnotation ) -> maybeAnnotation)
                 |> Dict.toList
                 |> List.foldr
                     (\( k, maybeAnnotation ) acc ->
@@ -68,7 +69,7 @@ toTypeDecl =
         toTypeAnnotation : Ast.Value -> Result String Type.Annotation
         toTypeAnnotation =
             Result.fromMaybe "No type mapped for this AST value"
-                << Ast.optCata typeAnnotationAttrs
+                << Ast.optPara typeAnnotationAttrs
                 << withCollapsedMaybes
     in
     Result.map (Elm.alias "Value") << toTypeAnnotation
@@ -78,12 +79,12 @@ toTypeDecl =
 -- DECODERS
 
 
-decoderExprAttrs : List (Ast.Attr Elm.Expression)
+decoderExprAttrs : List (Ast.AttrP Elm.Expression)
 decoderExprAttrs =
-    [ Ast.onString GD.string
-    , Ast.onInt GD.int
-    , Ast.onFloat GD.float
-    , Ast.onBool GD.bool
+    [ Ast.onStringP GD.string
+    , Ast.onIntP GD.int
+    , Ast.onFloatP GD.float
+    , Ast.onBoolP GD.bool
     ]
 
 
@@ -93,7 +94,7 @@ toDecoderDecl =
         toDecoderExpr : Ast.Value -> Result String Elm.Expression
         toDecoderExpr =
             Result.fromMaybe "Could not create a valid decoder for this type"
-                << Ast.optCata decoderExprAttrs
+                << Ast.optPara decoderExprAttrs
     in
     Result.map (Elm.declaration "decoder") << toDecoderExpr
 
@@ -115,34 +116,34 @@ which is where having this as an operation separate from the core catamorphism, 
 -}
 withCollapsedMaybes : Ast.Value -> Ast.Value
 withCollapsedMaybes =
-    Ast.cata
+    Ast.para
         { sString = SString
         , sInt = SInt
         , sFloat = SFloat
         , sBool = SBool
         , sOptional =
-            \inner ->
-                case inner of
+            \( _, recursedInner ) ->
+                case recursedInner of
                     SOptional _ ->
-                        inner
+                        recursedInner
 
                     SNullable _ ->
-                        inner
+                        recursedInner
 
                     _ ->
-                        SOptional inner
+                        SOptional recursedInner
         , sNullable =
-            \inner ->
-                case inner of
+            \( _, recursedInner ) ->
+                case recursedInner of
                     SOptional _ ->
-                        inner
+                        recursedInner
 
                     SNullable _ ->
-                        inner
+                        recursedInner
 
                     _ ->
-                        SNullable inner
-        , sArray = SArray
-        , sObject = SObject
+                        SNullable recursedInner
+        , sArray = \( _, recursed ) -> SArray recursed
+        , sObject = \dict -> SObject (Dict.map (\_ ( _, recursed ) -> recursed) dict)
         , sUnimplemented = SUnimplemented
         }
