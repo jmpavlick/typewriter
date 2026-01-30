@@ -18,16 +18,16 @@ import String.Extra
 toTypeAnnotation : () -> Ast.Value -> Result String Type.Annotation
 toTypeAnnotation () =
     Result.fromMaybe "No type mapped for this AST value"
-        << Ast.optMap (toTypeAnnotationOpts ())
+        << Ast.optMap_deprecated (toTypeAnnotationOpts ())
 
 
-toTypeAnnotationOpts : () -> List (Ast.Attr Type.Annotation)
+toTypeAnnotationOpts : () -> List (Ast.Attr_Deprecated Type.Annotation)
 toTypeAnnotationOpts _ =
     let
         isOptional : Ast.Value -> Bool
         isOptional v =
             Maybe.withDefault False <|
-                Ast.optMap
+                Ast.optMap_deprecated
                     [ Ast.onNullable (always <| Just True)
                     , Ast.onOptional (always <| Just True)
                     ]

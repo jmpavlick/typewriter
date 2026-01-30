@@ -1,8 +1,8 @@
 module Ast exposing
     ( Decl, Value(..)
     , decoder
-    , Props, map
-    , Attr, optMap, onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Attr_Deprecated, Props_Deprecated, map_deprecated, optMap_deprecated
     )
 
 {-|
@@ -41,7 +41,7 @@ type Value
 
 
 {-| -}
-type alias Props a =
+type alias Props_Deprecated a =
     { sString : () -> a
     , sInt : () -> a
     , sFloat : () -> a
@@ -54,13 +54,83 @@ type alias Props a =
     }
 
 
+{-| -}
+type alias Props a =
+    { sString : a
+    , sInt : a
+    , sFloat : a
+    , sBool : a
+    , sOptional : a -> a
+    , sNullable : a -> a
+    , sArray : a -> a
+    , sObject : Dict String a -> a
+    , sUnimplemented : String -> a
+    }
+
+
+{-| -}
+cata : Props a -> Value -> a
+cata props value =
+    case value of
+        SString ->
+            props.sString
+
+        SInt ->
+            props.sInt
+
+        SFloat ->
+            props.sFloat
+
+        SBool ->
+            props.sBool
+
+        SOptional inner ->
+            props.sOptional (cata props inner)
+
+        SNullable inner ->
+            props.sNullable (cata props inner)
+
+        SArray inner ->
+            props.sArray (cata props inner)
+
+        SObject inner ->
+            props.sObject (Dict.map (\_ v -> cata props v) inner)
+
+        SUnimplemented label ->
+            props.sUnimplemented label
+
+
+type alias Attr a =
+    Props (Maybe a) -> Props (Maybe a)
+
+
+{-| -}
+optCata : List (Attr a) -> Value -> Maybe a
+optCata attrs =
+    let
+        base : Props (Maybe a)
+        base =
+            { sString = Nothing
+            , sInt = Nothing
+            , sFloat = Nothing
+            , sBool = Nothing
+            , sOptional = always Nothing
+            , sNullable = always Nothing
+            , sArray = always Nothing
+            , sObject = always Nothing
+            , sUnimplemented = always Nothing
+            }
+    in
+    cata (List.foldl (<|) base attrs)
+
+
 
 -- MAPS
 
 
 {-| -}
-map : Props a -> Value -> a
-map props value =
+map_deprecated : Props_Deprecated a -> Value -> a
+map_deprecated props value =
     case value of
         SString ->
             props.sString ()
@@ -91,15 +161,15 @@ map props value =
 
 
 {-| -}
-type alias Attr a =
-    Props (Maybe a) -> Props (Maybe a)
+type alias Attr_Deprecated a =
+    Props_Deprecated (Maybe a) -> Props_Deprecated (Maybe a)
 
 
 {-| -}
-optMap : List (Attr a) -> Value -> Maybe a
-optMap attrs =
+optMap_deprecated : List (Attr_Deprecated a) -> Value -> Maybe a
+optMap_deprecated attrs =
     let
-        base : Props (Maybe a)
+        base : Props_Deprecated (Maybe a)
         base =
             { sString = always Nothing
             , sInt = always Nothing
@@ -112,60 +182,60 @@ optMap attrs =
             , sUnimplemented = always Nothing
             }
     in
-    map
+    map_deprecated
         (List.foldl (<|) base attrs)
 
 
 {-| -}
-onString : a -> Attr a
+onString : a -> Attr_Deprecated a
 onString value base =
     { base | sString = \() -> Just value }
 
 
 {-| -}
-onInt : a -> Attr a
+onInt : a -> Attr_Deprecated a
 onInt value base =
     { base | sInt = \() -> Just value }
 
 
 {-| -}
-onFloat : a -> Attr a
+onFloat : a -> Attr_Deprecated a
 onFloat value base =
     { base | sFloat = \() -> Just value }
 
 
 {-| -}
-onBool : a -> Attr a
+onBool : a -> Attr_Deprecated a
 onBool value base =
     { base | sBool = \() -> Just value }
 
 
 {-| -}
-onOptional : (Value -> Maybe a) -> Attr a
+onOptional : (Value -> Maybe a) -> Attr_Deprecated a
 onOptional fn base =
     { base | sOptional = \v -> fn v }
 
 
 {-| -}
-onNullable : (Value -> Maybe a) -> Attr a
+onNullable : (Value -> Maybe a) -> Attr_Deprecated a
 onNullable fn base =
     { base | sNullable = \v -> fn v }
 
 
 {-| -}
-onArray : (Value -> Maybe a) -> Attr a
+onArray : (Value -> Maybe a) -> Attr_Deprecated a
 onArray fn base =
     { base | sArray = \v -> fn v }
 
 
 {-| -}
-onObject : (Dict String Value -> Maybe a) -> Attr a
+onObject : (Dict String Value -> Maybe a) -> Attr_Deprecated a
 onObject fn base =
     { base | sObject = \dict -> fn dict }
 
 
 {-| -}
-onUnimplemented : (String -> Maybe a) -> Attr a
+onUnimplemented : (String -> Maybe a) -> Attr_Deprecated a
 onUnimplemented fn base =
     { base | sUnimplemented = \str -> fn str }
 
