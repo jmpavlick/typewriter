@@ -46,8 +46,8 @@ typeAnnotationAttrs =
     , Ast.onFloat Type.float
     , Ast.onBool Type.bool
     , Ast.onOptional
-        (\originalInner maybeAnnotation ->
-            case originalInner of
+        (\value maybeAnnotation ->
+            case value of
                 SOptional _ ->
                     maybeAnnotation
 
@@ -58,8 +58,8 @@ typeAnnotationAttrs =
                     Maybe.map Type.maybe maybeAnnotation
         )
     , Ast.onNullable
-        (\originalInner maybeAnnotation ->
-            case originalInner of
+        (\value maybeAnnotation ->
+            case value of
                 SOptional _ ->
                     maybeAnnotation
 
