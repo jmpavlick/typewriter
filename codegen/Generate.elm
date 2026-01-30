@@ -41,7 +41,15 @@ main =
                         List.map Tuple.second outputs
 
                 errs =
-                    List.map Tuple.first outputs
+                    List.filterMap
+                        (\( ( _, msgs ) as x, _ ) ->
+                            if List.length msgs > 0 then
+                                Just x
+
+                            else
+                                Nothing
+                        )
+                        outputs
 
                 errModule =
                     (\f ->
@@ -57,9 +65,8 @@ main =
                         <|
                             List.map
                                 (\( typeName, messages ) ->
-                                    Elm.declaration typeName <|
-                                        Elm.list <|
-                                            List.map Elm.string messages
+                                    Elm.withDocumentation (String.join "\n\n" <| List.map (\s -> "- " ++ s) messages) <|
+                                        Elm.declaration typeName Elm.Declare.placeholder
                                 )
                                 errs
 
