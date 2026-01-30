@@ -8,35 +8,8 @@ import List.Ext
 import String.Extra
 
 
-toTypeDecl : Ast.Value -> Result String Elm.Declaration
-toTypeDecl typedef =
-    let
-        toTypeAnnotation : () -> Ast.Value -> Result String Type.Annotation
-        toTypeAnnotation () =
-            Result.fromMaybe "No type mapped for this AST value"
-                << Ast.optCata
-                    [ Ast.onString Type.string
-                    , Ast.onInt Type.int
-                    , Ast.onFloat Type.float
-                    , Ast.onBool Type.bool
-                    , Ast.onOptional (Maybe.map Type.maybe)
-                    , Ast.onNullable (Maybe.map Type.maybe)
-                    , Ast.onArray (Maybe.map Type.list)
-                    , Ast.onObject
-                        (\dict ->
-                            dict
-                                |> Dict.toList
-                                |> List.foldr
-                                    (\( k, maybeAnnotation ) acc ->
-                                        Maybe.map2 (\annotation rest -> ( k, annotation ) :: rest) maybeAnnotation acc
-                                    )
-                                    (Just [])
-                                |> Maybe.map Type.record
-                        )
-                    ]
-                << withCollapsedMaybes
-    in
-    Result.map (Elm.alias "Value") <| toTypeAnnotation () typedef
+
+-- BUILD AN ELM FILE (or don't)
 
 
 build : List String -> Ast.Decl -> ( ( String, List String ), Maybe Elm.File )
@@ -46,6 +19,7 @@ build path ( moduleName, typedef ) =
             List.Ext.partitionMapResult identity <|
                 List.Ext.concatAp typedef
                     [ toTypeDecl >> List.singleton
+                    , toDecoderDecl >> List.singleton
                     ]
 
         buildFile =
@@ -58,6 +32,65 @@ build path ( moduleName, typedef ) =
       else
         Just <| buildFile decls
     )
+
+
+
+-- TYPE DECLARATIONS
+
+
+typeAnnotationAttrs : List (Ast.Attr Type.Annotation)
+typeAnnotationAttrs =
+    [ Ast.onString Type.string
+    , Ast.onInt Type.int
+    , Ast.onFloat Type.float
+    , Ast.onBool Type.bool
+    , Ast.onOptional (Maybe.map Type.maybe)
+    , Ast.onNullable (Maybe.map Type.maybe)
+    , Ast.onArray (Maybe.map Type.list)
+    , Ast.onObject
+        (\dict ->
+            dict
+                |> Dict.toList
+                |> List.foldr
+                    (\( k, maybeAnnotation ) acc ->
+                        Maybe.map2 (\annotation rest -> ( k, annotation ) :: rest) maybeAnnotation acc
+                    )
+                    (Just [])
+                |> Maybe.map Type.record
+        )
+    ]
+
+
+toTypeDecl : Ast.Value -> Result String Elm.Declaration
+toTypeDecl =
+    let
+        toTypeAnnotation : Ast.Value -> Result String Type.Annotation
+        toTypeAnnotation =
+            Result.fromMaybe "No type mapped for this AST value"
+                << Ast.optCata typeAnnotationAttrs
+                << withCollapsedMaybes
+    in
+    Result.map (Elm.alias "Value") << toTypeAnnotation
+
+
+
+-- DECODERS
+
+
+decoderExprAttrs : List (Ast.Attr Elm.Expression)
+decoderExprAttrs =
+    []
+
+
+toDecoderDecl : Ast.Value -> Result String Elm.Declaration
+toDecoderDecl =
+    let
+        toDecoderExpr : Ast.Value -> Result String Elm.Expression
+        toDecoderExpr =
+            Result.fromMaybe "Could not create a valid decoder for this type"
+                << Ast.optCata decoderExprAttrs
+    in
+    Result.map (Elm.declaration "decoder") << toDecoderExpr
 
 
 

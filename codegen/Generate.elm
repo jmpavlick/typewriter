@@ -65,7 +65,7 @@ main =
                         <|
                             List.map
                                 (\( typeName, messages ) ->
-                                    Elm.withDocumentation (String.join "\n\n" <| List.map (\s -> "- " ++ s) messages) <|
+                                    Elm.withDocumentation (typeName ++ ":\n\n" ++ (String.join "\n" <| List.map (\s -> "    - " ++ s) messages)) <|
                                         Elm.declaration typeName Elm.Declare.placeholder
                                 )
                                 errs
