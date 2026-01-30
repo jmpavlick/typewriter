@@ -10,26 +10,27 @@ import String.Extra
 
 toTypeAnnotation : () -> Ast.Value -> Result String Type.Annotation
 toTypeAnnotation () =
-    Ast.cata
-        { sString = Ok Type.string
-        , sInt = Ok Type.int
-        , sFloat = Ok Type.float
-        , sBool = Ok Type.bool
-        , sOptional = Result.map Type.maybe
-        , sNullable = Result.map Type.maybe
-        , sArray = Result.map Type.list
-        , sObject =
-            \dict ->
-                dict
-                    |> Dict.toList
-                    |> List.foldr
-                        (\( k, resultAnnotation ) acc ->
-                            Result.map2 (\annotation rest -> ( k, annotation ) :: rest) resultAnnotation acc
-                        )
-                        (Ok [])
-                    |> Result.map Type.record
-        , sUnimplemented = \str -> Err ("Unimplemented type: " ++ str)
-        }
+    Result.fromMaybe "No type mapped for this AST value"
+        << Ast.optCata
+            [ Ast.onString Type.string
+            , Ast.onInt Type.int
+            , Ast.onFloat Type.float
+            , Ast.onBool Type.bool
+            , Ast.onOptional (Maybe.map Type.maybe)
+            , Ast.onNullable (Maybe.map Type.maybe)
+            , Ast.onArray (Maybe.map Type.list)
+            , Ast.onObject
+                (\dict ->
+                    dict
+                        |> Dict.toList
+                        |> List.foldr
+                            (\( k, maybeAnnotation ) acc ->
+                                Maybe.map2 (\annotation rest -> ( k, annotation ) :: rest) maybeAnnotation acc
+                            )
+                            (Just [])
+                        |> Maybe.map Type.record
+                )
+            ]
 
 
 toTypeDecl : Ast.Value -> Result String Elm.Declaration
