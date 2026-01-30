@@ -5,6 +5,7 @@ import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
 import Gen.Json.Decode as GD
+import Gen.Json.Decode.Ext as GDE
 import List.Ext
 import String.Extra
 

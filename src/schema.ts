@@ -21,3 +21,11 @@ export const configSchema = z.object({
   input: inputConfigSchema,
   output: outputConfigSchema,
 })
+
+const nx = (b: boolean) => configSchema.omit({ workingDir: b ? true : undefined }) //.omit({ workingDir: true })
+
+const nxx = nx(true)
+
+type A = z.infer<typeof nxx>
+
+type Config = z.infer<typeof configSchema>
