@@ -8,8 +8,8 @@ import List.Ext
 import String.Extra
 
 
-collapseOptionals : Ast.Value -> Ast.Value
-collapseOptionals =
+withCollapsedMaybes : Ast.Value -> Ast.Value
+withCollapsedMaybes =
     Ast.cata
         { sString = SString
         , sInt = SInt
@@ -45,7 +45,7 @@ collapseOptionals =
 
 fold : List (Ast.Attr a) -> Ast.Value -> Maybe a
 fold attrs =
-    Ast.optCata attrs << collapseOptionals
+    Ast.optCata attrs << withCollapsedMaybes
 
 
 toTypeAnnotation : () -> Ast.Value -> Result String Type.Annotation
