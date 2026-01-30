@@ -4,6 +4,7 @@ import Ast exposing (Value(..))
 import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
+import Elm.Ext exposing (pipeline)
 import Gen.Json.Decode as GD
 import Gen.Json.Decode.Ext as GDE
 import List.Ext
@@ -106,6 +107,23 @@ decoderExprAttrs =
     , Ast.onInt GD.int
     , Ast.onFloat GD.float
     , Ast.onBool GD.bool
+    , Ast.onOptional (\_ innerDecoder -> Maybe.map GD.maybe innerDecoder)
+    , Ast.onNullable (\_ innerDecoder -> Maybe.map GD.nullable innerDecoder)
+    , Ast.onArray (\_ innerDecoder -> Maybe.map GD.list innerDecoder)
+    , Ast.onObject
+        (\_ dictOfMaybeDecoders ->
+            dictOfMaybeDecoders
+                |> Dict.toList
+                |> List.foldr
+                    (\( fieldName, maybeDecoder ) acc ->
+                        Maybe.map2
+                            (\decoder rest -> ( fieldName, decoder ) :: rest)
+                            maybeDecoder
+                            acc
+                    )
+                    (Just [])
+                |> Maybe.map toObjectDecoder
+        )
     ]
 
 
@@ -118,3 +136,37 @@ toDecoderDecl =
                 << Ast.optPara decoderExprAttrs
     in
     Result.map (Elm.declaration "decoder") << toDecoderExpr
+
+
+toObjectDecoder : List ( String, Elm.Expression ) -> Elm.Expression
+toObjectDecoder fields =
+    let
+        -- Argument specs for the constructor: [("field1", Nothing), ("field2", Nothing)]
+        argSpecs : List ( String, Maybe Type.Annotation )
+        argSpecs =
+            List.map (\( name, _ ) -> ( name, Nothing )) fields
+
+        -- Build the record constructor: \field1 field2 -> { field1 = field1, field2 = field2 }
+        ctor : Elm.Expression
+        ctor =
+            Elm.function argSpecs
+                (\argExprs ->
+                    Elm.record
+                        (List.map2
+                            (\( name, _ ) expr -> ( name, expr ))
+                            fields
+                            argExprs
+                        )
+                )
+
+        -- Build field decoders: [Dx.andMap (D.field "field1" decoder1), ...]
+        fieldDecoders : List (Elm.Expression -> Elm.Expression)
+        fieldDecoders =
+            List.map
+                (\( name, decoder ) ->
+                    GDE.andMap (GD.field name decoder)
+                )
+                fields
+    in
+    -- D.succeed ctor |> Dx.andMap decoder1 |> Dx.andMap decoder2 ...
+    pipeline (GD.succeed ctor) fieldDecoders
