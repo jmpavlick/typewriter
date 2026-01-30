@@ -41,7 +41,7 @@ type Value
     | SUnimplemented String
 
 
-{-| Props for paramorphism - handlers receive both original structure and recursed results
+{-| per-variant f-algebras for paramorphism
 -}
 type alias Props a =
     { sString : a
@@ -56,7 +56,7 @@ type alias Props a =
     }
 
 
-{-| Paramorphism - fold with access to original structure
+{-| a paramorphism is just a fold that gives you access to the structure that you're folding over
 -}
 para : Props a -> Value -> a
 para props value =
@@ -89,11 +89,17 @@ para props value =
             props.sUnimplemented str
 
 
+{-| an attr is a function that modifies the behavior of the f-algebra
+for a particular variant of our AST
+
+we expose functions that return props because that's the nice thing to do
+
+-}
 type alias Attr a =
     Props (Maybe a) -> Props (Maybe a)
 
 
-{-| Optional paramorphism
+{-| paramorphism but only over whatever properties you specify as caring about
 -}
 optPara : List (Attr a) -> Value -> Maybe a
 optPara attrs =
