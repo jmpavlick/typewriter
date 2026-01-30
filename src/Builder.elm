@@ -4,6 +4,7 @@ import Ast exposing (Value(..))
 import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
+import Gen.Json.Decode as GD
 import List.Ext
 import String.Extra
 
@@ -79,7 +80,11 @@ toTypeDecl =
 
 decoderExprAttrs : List (Ast.Attr Elm.Expression)
 decoderExprAttrs =
-    []
+    [ Ast.onString GD.string
+    , Ast.onInt GD.int
+    , Ast.onFloat GD.float
+    , Ast.onBool GD.bool
+    ]
 
 
 toDecoderDecl : Ast.Value -> Result String Elm.Declaration
@@ -102,8 +107,8 @@ by allowing something to be nullable, or undefined
 naturally, a thing can be _both_ of those things; and while there may be some nuance,
 for the sake creating Elm types, it's easier to consider: "okay, is this optional, or not?"
 
-_however_ - this doesn't apply unilaterally - e.g., we don't want our from-Typescript decoders
-or to-Typescript encoders to flatten structures that are truly not flat on the other end
+_however_ - this doesn't apply unilaterally - e.g., we don't want our to-Typescript encoders
+to flatten structures that are truly not flat on the other end
 
 which is where having this as an operation separate from the core catamorphism, is quite nice
 
