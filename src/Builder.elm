@@ -8,66 +8,28 @@ import List.Ext
 import String.Extra
 
 
-
--- toTypeAnnotation_ : () -> Ast.Value -> Type.Annotation
--- toTypeAnnotation_ () =
---     Maybe.withDefault (Type.named [] "Never")
---         << Ast.optMap (toTypeAnnotationOpts ())
-
-
 toTypeAnnotation : () -> Ast.Value -> Result String Type.Annotation
 toTypeAnnotation () =
-    Result.fromMaybe "No type mapped for this AST value"
-        << Ast.optMap_deprecated (toTypeAnnotationOpts ())
-
-
-toTypeAnnotationOpts : () -> List (Ast.Attr_Deprecated Type.Annotation)
-toTypeAnnotationOpts _ =
-    let
-        isOptional : Ast.Value -> Bool
-        isOptional v =
-            Maybe.withDefault False <|
-                Ast.optMap_deprecated
-                    [ Ast.onNullable_deprecated (always <| Just True)
-                    , Ast.onOptional_deprecated (always <| Just True)
-                    ]
-                    v
-
-        lookaheadOnOptional : Ast.Value -> Maybe Type.Annotation
-        lookaheadOnOptional next =
-            case toTypeAnnotation () next of
-                Err _ ->
-                    Nothing
-
-                Ok nextAnnotation ->
-                    Just
-                        (if isOptional next then
-                            nextAnnotation
-
-                         else
-                            Type.maybe <| nextAnnotation
+    Ast.cata
+        { sString = Ok Type.string
+        , sInt = Ok Type.int
+        , sFloat = Ok Type.float
+        , sBool = Ok Type.bool
+        , sOptional = Result.map Type.maybe
+        , sNullable = Result.map Type.maybe
+        , sArray = Result.map Type.list
+        , sObject =
+            \dict ->
+                dict
+                    |> Dict.toList
+                    |> List.foldr
+                        (\( k, resultAnnotation ) acc ->
+                            Result.map2 (\annotation rest -> ( k, annotation ) :: rest) resultAnnotation acc
                         )
-    in
-    [ Ast.onString_deprecated Type.string
-    , Ast.onInt_deprecated Type.int
-    , Ast.onBool_deprecated Type.bool
-    , Ast.onFloat_deprecated Type.float
-    , Ast.onOptional_deprecated (\next -> lookaheadOnOptional next)
-    , Ast.onNullable_deprecated (\next -> lookaheadOnOptional next)
-    , Ast.onArray_deprecated (\next -> Result.toMaybe <| Result.map Type.list <| toTypeAnnotation () next)
-    , Ast.onObject_deprecated
-        (\dict ->
-            Just <|
-                Type.record <|
-                    List.map (Tuple.mapSecond (Result.withDefault (Type.named [] "Never"))) <|
-                        Dict.toList <|
-                            Dict.map
-                                (\_ typedef ->
-                                    toTypeAnnotation () typedef
-                                )
-                                dict
-        )
-    ]
+                        (Ok [])
+                    |> Result.map Type.record
+        , sUnimplemented = \str -> Err ("Unimplemented type: " ++ str)
+        }
 
 
 toTypeDecl : Ast.Value -> Result String Elm.Declaration
