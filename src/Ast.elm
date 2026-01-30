@@ -1,6 +1,8 @@
 module Ast exposing
     ( Decl, Value(..)
     , decoder
+    , Attr, Props, cata, optCata
+    , onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
     , onString_deprecated, onInt_deprecated, onFloat_deprecated, onBool_deprecated, onOptional_deprecated, onNullable_deprecated, onArray_deprecated, onObject_deprecated, onUnimplemented_deprecated
     , Attr_Deprecated, Props_Deprecated, map_deprecated, optMap_deprecated
     )
@@ -122,6 +124,60 @@ optCata attrs =
             }
     in
     cata (List.foldl (<|) base attrs)
+
+
+{-| -}
+onString : a -> Attr a
+onString value base =
+    { base | sString = Just value }
+
+
+{-| -}
+onInt : a -> Attr a
+onInt value base =
+    { base | sInt = Just value }
+
+
+{-| -}
+onFloat : a -> Attr a
+onFloat value base =
+    { base | sFloat = Just value }
+
+
+{-| -}
+onBool : a -> Attr a
+onBool value base =
+    { base | sBool = Just value }
+
+
+{-| -}
+onOptional : (Maybe a -> Maybe a) -> Attr a
+onOptional fn base =
+    { base | sOptional = fn }
+
+
+{-| -}
+onNullable : (Maybe a -> Maybe a) -> Attr a
+onNullable fn base =
+    { base | sNullable = fn }
+
+
+{-| -}
+onArray : (Maybe a -> Maybe a) -> Attr a
+onArray fn base =
+    { base | sArray = fn }
+
+
+{-| -}
+onObject : (Dict String (Maybe a) -> Maybe a) -> Attr a
+onObject fn base =
+    { base | sObject = fn }
+
+
+{-| -}
+onUnimplemented : (String -> Maybe a) -> Attr a
+onUnimplemented fn base =
+    { base | sUnimplemented = fn }
 
 
 
