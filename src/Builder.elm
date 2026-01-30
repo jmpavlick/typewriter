@@ -45,8 +45,30 @@ typeAnnotationAttrs =
     , Ast.onIntP Type.int
     , Ast.onFloatP Type.float
     , Ast.onBoolP Type.bool
-    , Ast.onOptionalP (\( _, maybeAnnotation ) -> Maybe.map Type.maybe maybeAnnotation)
-    , Ast.onNullableP (\( _, maybeAnnotation ) -> Maybe.map Type.maybe maybeAnnotation)
+    , Ast.onOptionalP
+        (\( originalInner, maybeAnnotation ) ->
+            case originalInner of
+                SOptional _ ->
+                    maybeAnnotation
+
+                SNullable _ ->
+                    maybeAnnotation
+
+                _ ->
+                    Maybe.map Type.maybe maybeAnnotation
+        )
+    , Ast.onNullableP
+        (\( originalInner, maybeAnnotation ) ->
+            case originalInner of
+                SOptional _ ->
+                    maybeAnnotation
+
+                SNullable _ ->
+                    maybeAnnotation
+
+                _ ->
+                    Maybe.map Type.maybe maybeAnnotation
+        )
     , Ast.onArrayP (\( _, maybeAnnotation ) -> Maybe.map Type.list maybeAnnotation)
     , Ast.onObjectP
         (\dict ->
@@ -70,7 +92,6 @@ toTypeDecl =
         toTypeAnnotation =
             Result.fromMaybe "No type mapped for this AST value"
                 << Ast.optPara typeAnnotationAttrs
-                << withCollapsedMaybes
     in
     Result.map (Elm.alias "Value") << toTypeAnnotation
 
@@ -97,53 +118,3 @@ toDecoderDecl =
                 << Ast.optPara decoderExprAttrs
     in
     Result.map (Elm.declaration "decoder") << toDecoderExpr
-
-
-
--- INTERNALS
-
-
-{-| in typescript, there are (at least?) two ways to represent an optional value:
-by allowing something to be nullable, or undefined
-naturally, a thing can be _both_ of those things; and while there may be some nuance,
-for the sake creating Elm types, it's easier to consider: "okay, is this optional, or not?"
-
-_however_ - this doesn't apply unilaterally - e.g., we don't want our to-Typescript encoders
-to flatten structures that are truly not flat on the other end
-
-which is where having this as an operation separate from the core catamorphism, is quite nice
-
--}
-withCollapsedMaybes : Ast.Value -> Ast.Value
-withCollapsedMaybes =
-    Ast.para
-        { sString = SString
-        , sInt = SInt
-        , sFloat = SFloat
-        , sBool = SBool
-        , sOptional =
-            \( _, recursedInner ) ->
-                case recursedInner of
-                    SOptional _ ->
-                        recursedInner
-
-                    SNullable _ ->
-                        recursedInner
-
-                    _ ->
-                        SOptional recursedInner
-        , sNullable =
-            \( _, recursedInner ) ->
-                case recursedInner of
-                    SOptional _ ->
-                        recursedInner
-
-                    SNullable _ ->
-                        recursedInner
-
-                    _ ->
-                        SNullable recursedInner
-        , sArray = \( _, recursed ) -> SArray recursed
-        , sObject = \dict -> SObject (Dict.map (\_ ( _, recursed ) -> recursed) dict)
-        , sUnimplemented = SUnimplemented
-        }
