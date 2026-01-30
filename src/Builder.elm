@@ -48,33 +48,33 @@ fold attrs =
     Ast.optCata attrs << withCollapsedMaybes
 
 
-toTypeAnnotation : () -> Ast.Value -> Result String Type.Annotation
-toTypeAnnotation () =
-    Result.fromMaybe "No type mapped for this AST value"
-        << fold
-            [ Ast.onString Type.string
-            , Ast.onInt Type.int
-            , Ast.onFloat Type.float
-            , Ast.onBool Type.bool
-            , Ast.onOptional (Maybe.map Type.maybe)
-            , Ast.onNullable (Maybe.map Type.maybe)
-            , Ast.onArray (Maybe.map Type.list)
-            , Ast.onObject
-                (\dict ->
-                    dict
-                        |> Dict.toList
-                        |> List.foldr
-                            (\( k, maybeAnnotation ) acc ->
-                                Maybe.map2 (\annotation rest -> ( k, annotation ) :: rest) maybeAnnotation acc
-                            )
-                            (Just [])
-                        |> Maybe.map Type.record
-                )
-            ]
-
-
 toTypeDecl : Ast.Value -> Result String Elm.Declaration
 toTypeDecl typedef =
+    let
+        toTypeAnnotation : () -> Ast.Value -> Result String Type.Annotation
+        toTypeAnnotation () =
+            Result.fromMaybe "No type mapped for this AST value"
+                << fold
+                    [ Ast.onString Type.string
+                    , Ast.onInt Type.int
+                    , Ast.onFloat Type.float
+                    , Ast.onBool Type.bool
+                    , Ast.onOptional (Maybe.map Type.maybe)
+                    , Ast.onNullable (Maybe.map Type.maybe)
+                    , Ast.onArray (Maybe.map Type.list)
+                    , Ast.onObject
+                        (\dict ->
+                            dict
+                                |> Dict.toList
+                                |> List.foldr
+                                    (\( k, maybeAnnotation ) acc ->
+                                        Maybe.map2 (\annotation rest -> ( k, annotation ) :: rest) maybeAnnotation acc
+                                    )
+                                    (Just [])
+                                |> Maybe.map Type.record
+                        )
+                    ]
+    in
     Result.map (Elm.alias "Value") <| toTypeAnnotation () typedef
 
 

@@ -216,5 +216,8 @@ decodeHelp =
                             D.field "element" decoder
 
                     _ ->
+                        -- eventually we may handle more of zod's types
+                        -- just getting us up and moving with MVP for now;
+                        -- adding additional handlers will be trivial
                         D.succeed <| SUnimplemented type_
             )
