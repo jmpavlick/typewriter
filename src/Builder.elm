@@ -9,43 +9,38 @@ import String.Extra
 
 
 collapseOptionals : Ast.Value -> Ast.Value
-collapseOptionals value =
-    Maybe.withDefault value <|
-        Ast.optCata
-            [ Ast.onOptional
-                (\maybeInner ->
-                    Maybe.andThen
-                        (\inner ->
-                            case inner of
-                                SOptional _ ->
-                                    Just inner
+collapseOptionals =
+    Ast.cata
+        { sString = SString
+        , sInt = SInt
+        , sFloat = SFloat
+        , sBool = SBool
+        , sOptional =
+            \inner ->
+                case inner of
+                    SOptional _ ->
+                        inner
 
-                                SNullable _ ->
-                                    Just inner
+                    SNullable _ ->
+                        inner
 
-                                _ ->
-                                    Just (SOptional inner)
-                        )
-                        maybeInner
-                )
-            , Ast.onNullable
-                (\maybeInner ->
-                    Maybe.andThen
-                        (\inner ->
-                            case inner of
-                                SOptional _ ->
-                                    Just inner
+                    _ ->
+                        SOptional inner
+        , sNullable =
+            \inner ->
+                case inner of
+                    SOptional _ ->
+                        inner
 
-                                SNullable _ ->
-                                    Just inner
+                    SNullable _ ->
+                        inner
 
-                                _ ->
-                                    Just (SNullable inner)
-                        )
-                        maybeInner
-                )
-            ]
-            value
+                    _ ->
+                        SNullable inner
+        , sArray = SArray
+        , sObject = SObject
+        , sUnimplemented = SUnimplemented
+        }
 
 
 fold : List (Ast.Attr a) -> Ast.Value -> Maybe a
