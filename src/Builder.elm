@@ -134,6 +134,7 @@ toDecoderDecl =
         toDecoderExpr =
             Result.fromMaybe "Could not create a valid decoder for this type"
                 << Ast.optPara decoderExprAttrs
+                << withFlattenedOptionalValues
     in
     Result.map (Elm.declaration "decoder") << toDecoderExpr
 
@@ -176,3 +177,38 @@ toObjectDecoder fields =
     Elm.withType (Type.named [] "Json.Decode.Decoder Value") <|
         -- D.succeed ctor |> Dx.andMap decoder1 |> Dx.andMap decoder2 ...
         pipeline (GD.succeed ctor) fieldDecoders
+
+
+withFlattenedOptionalValues : Ast.Value -> Ast.Value
+withFlattenedOptionalValues =
+    Ast.para
+        { sString = SString
+        , sInt = SInt
+        , sFloat = SFloat
+        , sBool = SBool
+        , sOptional =
+            \innerOriginal innerRecursed ->
+                case innerOriginal of
+                    SOptional _ ->
+                        innerRecursed
+
+                    SNullable _ ->
+                        innerRecursed
+
+                    _ ->
+                        SOptional innerRecursed
+        , sNullable =
+            \innerOriginal innerRecursed ->
+                case innerOriginal of
+                    SOptional _ ->
+                        innerRecursed
+
+                    SNullable _ ->
+                        innerRecursed
+
+                    _ ->
+                        SNullable innerRecursed
+        , sArray = \_ recursed -> SArray recursed
+        , sObject = \_ recursed -> SObject recursed
+        , sUnimplemented = SUnimplemented
+        }
