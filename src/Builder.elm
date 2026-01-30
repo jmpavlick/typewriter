@@ -8,52 +8,6 @@ import List.Ext
 import String.Extra
 
 
-{-| in typescript, there are (at least?) two ways to represent an optional value:
-by allowing something to be nullable, or undefined
-naturally, a thing can be _both_ of those things; and while there may be some nuance,
-for the sake creating Elm types, it's easier to consider: "okay, is this optional, or not?"
-
-_however_ - this doesn't apply unilaterally - e.g., we don't want our from-Typescript decoders
-or to-Typescript encoders to flatten structures that are truly not flat on the other end
-
-which is where having this as an operation separate from the core catamorphism, is quite nice
-
--}
-withCollapsedMaybes : Ast.Value -> Ast.Value
-withCollapsedMaybes =
-    Ast.cata
-        { sString = SString
-        , sInt = SInt
-        , sFloat = SFloat
-        , sBool = SBool
-        , sOptional =
-            \inner ->
-                case inner of
-                    SOptional _ ->
-                        inner
-
-                    SNullable _ ->
-                        inner
-
-                    _ ->
-                        SOptional inner
-        , sNullable =
-            \inner ->
-                case inner of
-                    SOptional _ ->
-                        inner
-
-                    SNullable _ ->
-                        inner
-
-                    _ ->
-                        SNullable inner
-        , sArray = SArray
-        , sObject = SObject
-        , sUnimplemented = SUnimplemented
-        }
-
-
 toTypeDecl : Ast.Value -> Result String Elm.Declaration
 toTypeDecl typedef =
     let
@@ -104,3 +58,53 @@ build path ( moduleName, typedef ) =
       else
         Just <| buildFile decls
     )
+
+
+
+-- INTERNALS
+
+
+{-| in typescript, there are (at least?) two ways to represent an optional value:
+by allowing something to be nullable, or undefined
+naturally, a thing can be _both_ of those things; and while there may be some nuance,
+for the sake creating Elm types, it's easier to consider: "okay, is this optional, or not?"
+
+_however_ - this doesn't apply unilaterally - e.g., we don't want our from-Typescript decoders
+or to-Typescript encoders to flatten structures that are truly not flat on the other end
+
+which is where having this as an operation separate from the core catamorphism, is quite nice
+
+-}
+withCollapsedMaybes : Ast.Value -> Ast.Value
+withCollapsedMaybes =
+    Ast.cata
+        { sString = SString
+        , sInt = SInt
+        , sFloat = SFloat
+        , sBool = SBool
+        , sOptional =
+            \inner ->
+                case inner of
+                    SOptional _ ->
+                        inner
+
+                    SNullable _ ->
+                        inner
+
+                    _ ->
+                        SOptional inner
+        , sNullable =
+            \inner ->
+                case inner of
+                    SOptional _ ->
+                        inner
+
+                    SNullable _ ->
+                        inner
+
+                    _ ->
+                        SNullable inner
+        , sArray = SArray
+        , sObject = SObject
+        , sUnimplemented = SUnimplemented
+        }
