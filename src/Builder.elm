@@ -168,5 +168,11 @@ toObjectDecoder fields =
                 )
                 fields
     in
-    -- D.succeed ctor |> Dx.andMap decoder1 |> Dx.andMap decoder2 ...
-    pipeline (GD.succeed ctor) fieldDecoders
+    -- hack lol; the type that elm-codegen infers is actually the type of the constructor, bizarrely enough -
+    -- probably something to do with an implementation detail of `pipeline` that i don't know about
+    -- but if you hit 'em with the ol' "trust me bro", well, the only type we're naming in a module
+    -- is called `Value`, this is a `Json.Decode.Decoder` for a type called `Value`, and boy i sure hope
+    -- that none of these constants change on us, that'd be a bummer, yeah?
+    Elm.withType (Type.named [] "Json.Decode.Decoder Value") <|
+        -- D.succeed ctor |> Dx.andMap decoder1 |> Dx.andMap decoder2 ...
+        pipeline (GD.succeed ctor) fieldDecoders
