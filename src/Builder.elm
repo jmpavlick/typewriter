@@ -5,6 +5,7 @@ import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
 import Elm.Ext exposing (pipeline)
+import Gen.BigInt
 import Gen.Json.Decode as GD
 import Gen.Json.Decode.Ext as GDE
 import Gen.Json.Encode as GE
@@ -49,6 +50,7 @@ typeAnnotationAttrs =
     , Ast.onFloat Type.float
     , Ast.onBool Type.bool
     , Ast.onAny GE.annotation_.value
+    , Ast.onBigint Gen.BigInt.annotation_.bigInt
     , Ast.onNullableOrOptionalFlat Type.maybe
     , Ast.onArray (always (Maybe.map Type.list))
     , Ast.onObject
@@ -87,6 +89,12 @@ decoderExprAttrs =
     , Ast.onFloat GD.float
     , Ast.onBool GD.bool
     , Ast.onAny GD.value
+    , Ast.onBigint <|
+        GD.oneOf
+            [ GD.map Gen.BigInt.call_.fromInt GD.int
+
+            -- TODO: figure out how to do case exprs in elm-codegen
+            ]
     , Ast.onNullableOrOptionalFlat
         (\dec ->
             GD.oneOf

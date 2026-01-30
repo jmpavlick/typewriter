@@ -2,7 +2,7 @@ module Ast exposing
     ( Decl, Value(..)
     , decoder
     , Props
-    , Attr, onString, onInt, onFloat, onBool, onAny, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Attr, onString, onInt, onFloat, onBool, onAny, onBigint, onOptional, onNullable, onArray, onObject, onUnimplemented
     , onNullableOrOptionalFlat, optPara, para
     )
 
@@ -11,7 +11,7 @@ module Ast exposing
 @docs Decl, Value
 @docs decoder
 @docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onBigint, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
 
 -}
 
@@ -35,6 +35,7 @@ type Value
     | SFloat
     | SBool
     | SAny
+    | SBigint
     | SOptional Value
     | SNullable Value
     | SArray Value
@@ -50,10 +51,14 @@ type alias Props a =
     , sFloat : a
     , sBool : a
     , sAny : a
+    , sBigint : a
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
     , sObject : Dict String Value -> Dict String a -> a
+
+    -- TODO: how to make this open / recursive
+    -- maybe `String -> (Maybe (a -> a))`
     , sUnimplemented : String -> a
     }
 
@@ -77,6 +82,9 @@ para props value =
 
         SAny ->
             props.sAny
+
+        SBigint ->
+            props.sBigint
 
         SOptional inner ->
             props.sOptional inner (para props inner)
@@ -116,6 +124,7 @@ optPara attrs =
             , sFloat = Nothing
             , sBool = Nothing
             , sAny = Nothing
+            , sBigint = Nothing
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
@@ -154,6 +163,12 @@ onBool value base =
 onAny : a -> Attr a
 onAny value base =
     { base | sAny = Just value }
+
+
+{-| -}
+onBigint : a -> Attr a
+onBigint value base =
+    { base | sBigint = Just value }
 
 
 {-| -}
@@ -254,6 +269,9 @@ decodeHelp =
 
                     "any" ->
                         D.succeed SAny
+
+                    "bigint" ->
+                        D.succeed SBigint
 
                     "optional" ->
                         D.map SOptional <|
