@@ -39,13 +39,13 @@ build path ( moduleName, typedef ) =
 -- TYPE DECLARATIONS
 
 
-typeAnnotationAttrs : List (Ast.AttrP Type.Annotation)
+typeAnnotationAttrs : List (Ast.Attr Type.Annotation)
 typeAnnotationAttrs =
-    [ Ast.onStringP Type.string
-    , Ast.onIntP Type.int
-    , Ast.onFloatP Type.float
-    , Ast.onBoolP Type.bool
-    , Ast.onOptionalP
+    [ Ast.onString Type.string
+    , Ast.onInt Type.int
+    , Ast.onFloat Type.float
+    , Ast.onBool Type.bool
+    , Ast.onOptional
         (\( originalInner, maybeAnnotation ) ->
             case originalInner of
                 SOptional _ ->
@@ -57,7 +57,7 @@ typeAnnotationAttrs =
                 _ ->
                     Maybe.map Type.maybe maybeAnnotation
         )
-    , Ast.onNullableP
+    , Ast.onNullable
         (\( originalInner, maybeAnnotation ) ->
             case originalInner of
                 SOptional _ ->
@@ -69,8 +69,8 @@ typeAnnotationAttrs =
                 _ ->
                     Maybe.map Type.maybe maybeAnnotation
         )
-    , Ast.onArrayP (\( _, maybeAnnotation ) -> Maybe.map Type.list maybeAnnotation)
-    , Ast.onObjectP
+    , Ast.onArray (\( _, maybeAnnotation ) -> Maybe.map Type.list maybeAnnotation)
+    , Ast.onObject
         (\dict ->
             dict
                 |> Dict.map (\_ ( _, maybeAnnotation ) -> maybeAnnotation)
@@ -100,12 +100,12 @@ toTypeDecl =
 -- DECODERS
 
 
-decoderExprAttrs : List (Ast.AttrP Elm.Expression)
+decoderExprAttrs : List (Ast.Attr Elm.Expression)
 decoderExprAttrs =
-    [ Ast.onStringP GD.string
-    , Ast.onIntP GD.int
-    , Ast.onFloatP GD.float
-    , Ast.onBoolP GD.bool
+    [ Ast.onString GD.string
+    , Ast.onInt GD.int
+    , Ast.onFloat GD.float
+    , Ast.onBool GD.bool
     ]
 
 

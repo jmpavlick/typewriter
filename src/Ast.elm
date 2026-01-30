@@ -3,10 +3,7 @@ module Ast exposing
     , decoder
     , Props
     , Attr, onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
-    , cata, optCata
-    , PropsP
-    , AttrP, onStringP, onIntP, onFloatP, onBoolP, onOptionalP, onNullableP, onArrayP, onObjectP, onUnimplementedP
-    , para, optPara
+    , optPara, para
     )
 
 {-|
@@ -44,136 +41,9 @@ type Value
     | SUnimplemented String
 
 
-{-| -}
+{-| Props for paramorphism - handlers receive both original structure and recursed results
+-}
 type alias Props a =
-    { sString : a
-    , sInt : a
-    , sFloat : a
-    , sBool : a
-    , sOptional : a -> a
-    , sNullable : a -> a
-    , sArray : a -> a
-    , sObject : Dict String a -> a
-    , sUnimplemented : String -> a
-    }
-
-
-{-| -}
-cata : Props a -> Value -> a
-cata props value =
-    case value of
-        SString ->
-            props.sString
-
-        SInt ->
-            props.sInt
-
-        SFloat ->
-            props.sFloat
-
-        SBool ->
-            props.sBool
-
-        SOptional inner ->
-            props.sOptional (cata props inner)
-
-        SNullable inner ->
-            props.sNullable (cata props inner)
-
-        SArray inner ->
-            props.sArray (cata props inner)
-
-        SObject inner ->
-            props.sObject (Dict.map (\_ v -> cata props v) inner)
-
-        SUnimplemented label ->
-            props.sUnimplemented label
-
-
-type alias Attr a =
-    Props (Maybe a) -> Props (Maybe a)
-
-
-{-| -}
-optCata : List (Attr a) -> Value -> Maybe a
-optCata attrs =
-    let
-        base : Props (Maybe a)
-        base =
-            { sString = Nothing
-            , sInt = Nothing
-            , sFloat = Nothing
-            , sBool = Nothing
-            , sOptional = always Nothing
-            , sNullable = always Nothing
-            , sArray = always Nothing
-            , sObject = always Nothing
-            , sUnimplemented = always Nothing
-            }
-    in
-    cata (List.foldl (<|) base attrs)
-
-
-{-| -}
-onString : a -> Attr a
-onString value base =
-    { base | sString = Just value }
-
-
-{-| -}
-onInt : a -> Attr a
-onInt value base =
-    { base | sInt = Just value }
-
-
-{-| -}
-onFloat : a -> Attr a
-onFloat value base =
-    { base | sFloat = Just value }
-
-
-{-| -}
-onBool : a -> Attr a
-onBool value base =
-    { base | sBool = Just value }
-
-
-{-| -}
-onOptional : (Maybe a -> Maybe a) -> Attr a
-onOptional fn base =
-    { base | sOptional = fn }
-
-
-{-| -}
-onNullable : (Maybe a -> Maybe a) -> Attr a
-onNullable fn base =
-    { base | sNullable = fn }
-
-
-{-| -}
-onArray : (Maybe a -> Maybe a) -> Attr a
-onArray fn base =
-    { base | sArray = fn }
-
-
-{-| -}
-onObject : (Dict String (Maybe a) -> Maybe a) -> Attr a
-onObject fn base =
-    { base | sObject = fn }
-
-
-{-| -}
-onUnimplemented : (String -> Maybe a) -> Attr a
-onUnimplemented fn base =
-    { base | sUnimplemented = fn }
-
-
-
--- PARAMORPHISM
-
-
-{-| Props for paramorphism - handlers receive both original structure and recursed results -}
-type alias PropsP a =
     { sString : a
     , sInt : a
     , sFloat : a
@@ -186,8 +56,9 @@ type alias PropsP a =
     }
 
 
-{-| Paramorphism - fold with access to original structure -}
-para : PropsP a -> Value -> a
+{-| Paramorphism - fold with access to original structure
+-}
+para : Props a -> Value -> a
 para props value =
     case value of
         SString ->
@@ -218,15 +89,16 @@ para props value =
             props.sUnimplemented str
 
 
-type alias AttrP a =
-    PropsP (Maybe a) -> PropsP (Maybe a)
+type alias Attr a =
+    Props (Maybe a) -> Props (Maybe a)
 
 
-{-| Optional paramorphism -}
-optPara : List (AttrP a) -> Value -> Maybe a
+{-| Optional paramorphism
+-}
+optPara : List (Attr a) -> Value -> Maybe a
 optPara attrs =
     let
-        base : PropsP (Maybe a)
+        base : Props (Maybe a)
         base =
             { sString = Nothing
             , sInt = Nothing
@@ -243,56 +115,56 @@ optPara attrs =
 
 
 {-| -}
-onStringP : a -> AttrP a
-onStringP value base =
+onString : a -> Attr a
+onString value base =
     { base | sString = Just value }
 
 
 {-| -}
-onIntP : a -> AttrP a
-onIntP value base =
+onInt : a -> Attr a
+onInt value base =
     { base | sInt = Just value }
 
 
 {-| -}
-onFloatP : a -> AttrP a
-onFloatP value base =
+onFloat : a -> Attr a
+onFloat value base =
     { base | sFloat = Just value }
 
 
 {-| -}
-onBoolP : a -> AttrP a
-onBoolP value base =
+onBool : a -> Attr a
+onBool value base =
     { base | sBool = Just value }
 
 
 {-| -}
-onOptionalP : (( Value, Maybe a ) -> Maybe a) -> AttrP a
-onOptionalP fn base =
+onOptional : (( Value, Maybe a ) -> Maybe a) -> Attr a
+onOptional fn base =
     { base | sOptional = fn }
 
 
 {-| -}
-onNullableP : (( Value, Maybe a ) -> Maybe a) -> AttrP a
-onNullableP fn base =
+onNullable : (( Value, Maybe a ) -> Maybe a) -> Attr a
+onNullable fn base =
     { base | sNullable = fn }
 
 
 {-| -}
-onArrayP : (( Value, Maybe a ) -> Maybe a) -> AttrP a
-onArrayP fn base =
+onArray : (( Value, Maybe a ) -> Maybe a) -> Attr a
+onArray fn base =
     { base | sArray = fn }
 
 
 {-| -}
-onObjectP : (Dict String ( Value, Maybe a ) -> Maybe a) -> AttrP a
-onObjectP fn base =
+onObject : (Dict String ( Value, Maybe a ) -> Maybe a) -> Attr a
+onObject fn base =
     { base | sObject = fn }
 
 
 {-| -}
-onUnimplementedP : (String -> Maybe a) -> AttrP a
-onUnimplementedP fn base =
+onUnimplemented : (String -> Maybe a) -> Attr a
+onUnimplemented fn base =
     { base | sUnimplemented = fn }
 
 
