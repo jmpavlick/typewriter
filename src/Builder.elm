@@ -12,11 +12,7 @@ collapseOptionals : Ast.Value -> Ast.Value
 collapseOptionals value =
     Maybe.withDefault value <|
         Ast.optCata
-            [ Ast.onString SString
-            , Ast.onInt SInt
-            , Ast.onFloat SFloat
-            , Ast.onBool SBool
-            , Ast.onOptional
+            [ Ast.onOptional
                 (\maybeInner ->
                     Maybe.andThen
                         (\inner ->
@@ -48,9 +44,6 @@ collapseOptionals value =
                         )
                         maybeInner
                 )
-            , Ast.onArray (Maybe.map SArray)
-            , Ast.onObject (Maybe.map SObject)
-            , Ast.onUnimplemented (Just << SUnimplemented)
             ]
             value
 
