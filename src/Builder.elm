@@ -8,10 +8,46 @@ import List.Ext
 import String.Extra
 
 
+collapseOptionals : Ast.Value -> Ast.Value
+collapseOptionals value =
+    case value of
+        SOptional (SOptional inner) ->
+            collapseOptionals (SOptional inner)
+
+        SOptional (SNullable inner) ->
+            collapseOptionals (SOptional inner)
+
+        SNullable (SOptional inner) ->
+            collapseOptionals (SNullable inner)
+
+        SNullable (SNullable inner) ->
+            collapseOptionals (SNullable inner)
+
+        SOptional inner ->
+            SOptional (collapseOptionals inner)
+
+        SNullable inner ->
+            SNullable (collapseOptionals inner)
+
+        SArray inner ->
+            SArray (collapseOptionals inner)
+
+        SObject dict ->
+            SObject (Dict.map (\_ v -> collapseOptionals v) dict)
+
+        _ ->
+            value
+
+
+fold : List (Ast.Attr a) -> Ast.Value -> Maybe a
+fold attrs =
+    Ast.optCata attrs << collapseOptionals
+
+
 toTypeAnnotation : () -> Ast.Value -> Result String Type.Annotation
 toTypeAnnotation () =
     Result.fromMaybe "No type mapped for this AST value"
-        << Ast.optCata
+        << fold
             [ Ast.onString Type.string
             , Ast.onInt Type.int
             , Ast.onFloat Type.float
