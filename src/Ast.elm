@@ -3,7 +3,7 @@ module Ast exposing
     , decoder
     , Props
     , Attr, onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
-    , optPara, para
+    , onNullableOrOptionalFlat, optPara, para
     )
 
 {-|
@@ -11,7 +11,7 @@ module Ast exposing
 @docs Decl, Value
 @docs decoder
 @docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
 
 -}
 
@@ -148,6 +148,34 @@ onOptional fn base =
 onNullable : (Value -> Maybe a -> Maybe a) -> Attr a
 onNullable fn base =
     { base | sNullable = fn }
+
+
+{-| convenience function to make it easier to apply a transformation
+to optional / nullable values, without allowing them to nest indefinitely;
+in typescript, `prop?: string | null` decodes `"hello"` or `undefined` or `null`
+equally as well, but our codegen will create a type and matching decoder
+like `prop : Maybe (Maybe String)`, which... sucks.
+-}
+onNullableOrOptionalFlat : (a -> a) -> Attr a
+onNullableOrOptionalFlat fn base =
+    let
+        flattener : Value -> Maybe a -> Maybe a
+        flattener =
+            \value maybeA ->
+                case value of
+                    SOptional _ ->
+                        maybeA
+
+                    SNullable _ ->
+                        maybeA
+
+                    _ ->
+                        Maybe.map fn maybeA
+    in
+    { base
+        | sOptional = flattener
+        , sNullable = flattener
+    }
 
 
 {-| -}

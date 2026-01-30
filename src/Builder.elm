@@ -47,30 +47,7 @@ typeAnnotationAttrs =
     , Ast.onInt Type.int
     , Ast.onFloat Type.float
     , Ast.onBool Type.bool
-    , Ast.onOptional
-        (\value maybeAnnotation ->
-            case value of
-                SOptional _ ->
-                    maybeAnnotation
-
-                SNullable _ ->
-                    maybeAnnotation
-
-                _ ->
-                    Maybe.map Type.maybe maybeAnnotation
-        )
-    , Ast.onNullable
-        (\value maybeAnnotation ->
-            case value of
-                SOptional _ ->
-                    maybeAnnotation
-
-                SNullable _ ->
-                    maybeAnnotation
-
-                _ ->
-                    Maybe.map Type.maybe maybeAnnotation
-        )
+    , Ast.onNullableOrOptionalFlat Type.maybe
     , Ast.onArray (always (Maybe.map Type.list))
     , Ast.onObject
         (\_ dictOfMaybeAnnotations ->
@@ -107,8 +84,13 @@ decoderExprAttrs =
     , Ast.onInt GD.int
     , Ast.onFloat GD.float
     , Ast.onBool GD.bool
-    , Ast.onOptional (\_ innerDecoder -> Maybe.map GD.maybe innerDecoder)
-    , Ast.onNullable (\_ innerDecoder -> Maybe.map GD.nullable innerDecoder)
+    , Ast.onNullableOrOptionalFlat
+        (\dec ->
+            GD.oneOf
+                [ GD.maybe dec
+                , GD.nullable dec
+                ]
+        )
     , Ast.onArray (\_ innerDecoder -> Maybe.map GD.list innerDecoder)
     , Ast.onObject
         (\_ dictOfMaybeDecoders ->
@@ -134,7 +116,8 @@ toDecoderDecl =
         toDecoderExpr =
             Result.fromMaybe "Could not create a valid decoder for this type"
                 << Ast.optPara decoderExprAttrs
-                << withFlattenedOptionalValues
+
+        -- << withFlattenedOptionalValues
     in
     Result.map (Elm.declaration "decoder") << toDecoderExpr
 
