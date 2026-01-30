@@ -8,43 +8,43 @@ import List.Ext
 import String.Extra
 
 
-withCollapsedMaybes : Ast.Value -> Ast.Value
-withCollapsedMaybes =
-    Ast.cata
-        { sString = SString
-        , sInt = SInt
-        , sFloat = SFloat
-        , sBool = SBool
-        , sOptional =
-            \inner ->
-                case inner of
-                    SOptional _ ->
-                        inner
-
-                    SNullable _ ->
-                        inner
-
-                    _ ->
-                        SOptional inner
-        , sNullable =
-            \inner ->
-                case inner of
-                    SOptional _ ->
-                        inner
-
-                    SNullable _ ->
-                        inner
-
-                    _ ->
-                        SNullable inner
-        , sArray = SArray
-        , sObject = SObject
-        , sUnimplemented = SUnimplemented
-        }
-
-
 fold : List (Ast.Attr a) -> Ast.Value -> Maybe a
 fold attrs =
+    let
+        withCollapsedMaybes : Ast.Value -> Ast.Value
+        withCollapsedMaybes =
+            Ast.cata
+                { sString = SString
+                , sInt = SInt
+                , sFloat = SFloat
+                , sBool = SBool
+                , sOptional =
+                    \inner ->
+                        case inner of
+                            SOptional _ ->
+                                inner
+
+                            SNullable _ ->
+                                inner
+
+                            _ ->
+                                SOptional inner
+                , sNullable =
+                    \inner ->
+                        case inner of
+                            SOptional _ ->
+                                inner
+
+                            SNullable _ ->
+                                inner
+
+                            _ ->
+                                SNullable inner
+                , sArray = SArray
+                , sObject = SObject
+                , sUnimplemented = SUnimplemented
+                }
+    in
     Ast.optCata attrs << withCollapsedMaybes
 
 
