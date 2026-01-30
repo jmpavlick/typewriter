@@ -48,10 +48,10 @@ type alias Props a =
     , sInt : a
     , sFloat : a
     , sBool : a
-    , sOptional : ( Value, a ) -> a
-    , sNullable : ( Value, a ) -> a
-    , sArray : ( Value, a ) -> a
-    , sObject : Dict String ( Value, a ) -> a
+    , sOptional : Value -> a -> a
+    , sNullable : Value -> a -> a
+    , sArray : Value -> a -> a
+    , sObject : Dict String Value -> Dict String a -> a
     , sUnimplemented : String -> a
     }
 
@@ -74,16 +74,16 @@ para props value =
             props.sBool
 
         SOptional inner ->
-            props.sOptional ( inner, para props inner )
+            props.sOptional inner (para props inner)
 
         SNullable inner ->
-            props.sNullable ( inner, para props inner )
+            props.sNullable inner (para props inner)
 
         SArray inner ->
-            props.sArray ( inner, para props inner )
+            props.sArray inner (para props inner)
 
         SObject dict ->
-            props.sObject (Dict.map (\_ v -> ( v, para props v )) dict)
+            props.sObject dict (Dict.map (\_ v -> para props v) dict)
 
         SUnimplemented str ->
             props.sUnimplemented str
@@ -104,11 +104,11 @@ optPara attrs =
             , sInt = Nothing
             , sFloat = Nothing
             , sBool = Nothing
-            , sOptional = always Nothing
-            , sNullable = always Nothing
-            , sArray = always Nothing
-            , sObject = always Nothing
-            , sUnimplemented = always Nothing
+            , sOptional = \_ _ -> Nothing
+            , sNullable = \_ _ -> Nothing
+            , sArray = \_ _ -> Nothing
+            , sObject = \_ _ -> Nothing
+            , sUnimplemented = \_ -> Nothing
             }
     in
     para (List.foldl (<|) base attrs)
@@ -139,25 +139,25 @@ onBool value base =
 
 
 {-| -}
-onOptional : (( Value, Maybe a ) -> Maybe a) -> Attr a
+onOptional : (Value -> Maybe a -> Maybe a) -> Attr a
 onOptional fn base =
     { base | sOptional = fn }
 
 
 {-| -}
-onNullable : (( Value, Maybe a ) -> Maybe a) -> Attr a
+onNullable : (Value -> Maybe a -> Maybe a) -> Attr a
 onNullable fn base =
     { base | sNullable = fn }
 
 
 {-| -}
-onArray : (( Value, Maybe a ) -> Maybe a) -> Attr a
+onArray : (Value -> Maybe a -> Maybe a) -> Attr a
 onArray fn base =
     { base | sArray = fn }
 
 
 {-| -}
-onObject : (Dict String ( Value, Maybe a ) -> Maybe a) -> Attr a
+onObject : (Dict String Value -> Dict String (Maybe a) -> Maybe a) -> Attr a
 onObject fn base =
     { base | sObject = fn }
 

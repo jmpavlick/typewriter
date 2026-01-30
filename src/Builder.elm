@@ -46,7 +46,7 @@ typeAnnotationAttrs =
     , Ast.onFloat Type.float
     , Ast.onBool Type.bool
     , Ast.onOptional
-        (\( originalInner, maybeAnnotation ) ->
+        (\originalInner maybeAnnotation ->
             case originalInner of
                 SOptional _ ->
                     maybeAnnotation
@@ -58,7 +58,7 @@ typeAnnotationAttrs =
                     Maybe.map Type.maybe maybeAnnotation
         )
     , Ast.onNullable
-        (\( originalInner, maybeAnnotation ) ->
+        (\originalInner maybeAnnotation ->
             case originalInner of
                 SOptional _ ->
                     maybeAnnotation
@@ -69,11 +69,10 @@ typeAnnotationAttrs =
                 _ ->
                     Maybe.map Type.maybe maybeAnnotation
         )
-    , Ast.onArray (\( _, maybeAnnotation ) -> Maybe.map Type.list maybeAnnotation)
+    , Ast.onArray (always (Maybe.map Type.list))
     , Ast.onObject
-        (\dict ->
-            dict
-                |> Dict.map (\_ ( _, maybeAnnotation ) -> maybeAnnotation)
+        (\_ dictOfMaybeAnnotations ->
+            dictOfMaybeAnnotations
                 |> Dict.toList
                 |> List.foldr
                     (\( k, maybeAnnotation ) acc ->
