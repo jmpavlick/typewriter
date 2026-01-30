@@ -1,10 +1,9 @@
 module Ast exposing
     ( Decl, Value(..)
     , decoder
-    , Attr, Props, cata, optCata
-    , onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
-    , onString_deprecated, onInt_deprecated, onFloat_deprecated, onBool_deprecated, onOptional_deprecated, onNullable_deprecated, onArray_deprecated, onObject_deprecated, onUnimplemented_deprecated
-    , Attr_Deprecated, Props_Deprecated, map_deprecated, optMap_deprecated
+    , Props
+    , Attr, onString, onInt, onFloat, onBool, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , cata, optCata
     )
 
 {-|
@@ -40,20 +39,6 @@ type Value
     | SArray Value
     | SObject (Dict String Value)
     | SUnimplemented String
-
-
-{-| -}
-type alias Props_Deprecated a =
-    { sString : () -> a
-    , sInt : () -> a
-    , sFloat : () -> a
-    , sBool : () -> a
-    , sOptional : Value -> a
-    , sNullable : Value -> a
-    , sArray : Value -> a
-    , sObject : Dict String Value -> a
-    , sUnimplemented : String -> a
-    }
 
 
 {-| -}
@@ -178,122 +163,6 @@ onObject fn base =
 onUnimplemented : (String -> Maybe a) -> Attr a
 onUnimplemented fn base =
     { base | sUnimplemented = fn }
-
-
-
--- MAPS
-
-
-{-| -}
-map_deprecated : Props_Deprecated a -> Value -> a
-map_deprecated props value =
-    case value of
-        SString ->
-            props.sString ()
-
-        SInt ->
-            props.sInt ()
-
-        SFloat ->
-            props.sFloat ()
-
-        SBool ->
-            props.sBool ()
-
-        SOptional v ->
-            props.sOptional v
-
-        SNullable v ->
-            props.sNullable v
-
-        SArray v ->
-            props.sArray v
-
-        SObject dict ->
-            props.sObject dict
-
-        SUnimplemented str ->
-            props.sUnimplemented str
-
-
-{-| -}
-type alias Attr_Deprecated a =
-    Props_Deprecated (Maybe a) -> Props_Deprecated (Maybe a)
-
-
-{-| -}
-optMap_deprecated : List (Attr_Deprecated a) -> Value -> Maybe a
-optMap_deprecated attrs =
-    let
-        base : Props_Deprecated (Maybe a)
-        base =
-            { sString = always Nothing
-            , sInt = always Nothing
-            , sFloat = always Nothing
-            , sBool = always Nothing
-            , sOptional = always Nothing
-            , sNullable = always Nothing
-            , sArray = always Nothing
-            , sObject = always Nothing
-            , sUnimplemented = always Nothing
-            }
-    in
-    map_deprecated
-        (List.foldl (<|) base attrs)
-
-
-{-| -}
-onString_deprecated : a -> Attr_Deprecated a
-onString_deprecated value base =
-    { base | sString = \() -> Just value }
-
-
-{-| -}
-onInt_deprecated : a -> Attr_Deprecated a
-onInt_deprecated value base =
-    { base | sInt = \() -> Just value }
-
-
-{-| -}
-onFloat_deprecated : a -> Attr_Deprecated a
-onFloat_deprecated value base =
-    { base | sFloat = \() -> Just value }
-
-
-{-| -}
-onBool_deprecated : a -> Attr_Deprecated a
-onBool_deprecated value base =
-    { base | sBool = \() -> Just value }
-
-
-{-| -}
-onOptional_deprecated : (Value -> Maybe a) -> Attr_Deprecated a
-onOptional_deprecated fn base =
-    { base | sOptional = \v -> fn v }
-
-
-{-| -}
-onNullable_deprecated : (Value -> Maybe a) -> Attr_Deprecated a
-onNullable_deprecated fn base =
-    { base | sNullable = \v -> fn v }
-
-
-{-| -}
-onArray_deprecated : (Value -> Maybe a) -> Attr_Deprecated a
-onArray_deprecated fn base =
-    { base | sArray = \v -> fn v }
-
-
-{-| -}
-onObject_deprecated : (Dict String Value -> Maybe a) -> Attr_Deprecated a
-onObject_deprecated fn base =
-    { base | sObject = \dict -> fn dict }
-
-
-{-| -}
-onUnimplemented_deprecated : (String -> Maybe a) -> Attr_Deprecated a
-onUnimplemented_deprecated fn base =
-    { base | sUnimplemented = \str -> fn str }
 
 
 
