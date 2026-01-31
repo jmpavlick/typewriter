@@ -16,7 +16,7 @@ export const number_ = z.number()
 export const null_ = z.null()
 
 // zod primivites
-export const bigint_ = z.bigint()
+export const bigInt_ = z.bigInt()
 export const int_ = z.int()
 export const date_ = z.date()
 export const email_ = z.email()
@@ -38,7 +38,7 @@ export const optNumber = z.number().optional()
 export const optNull = z.null().optional()
 
 // zod optional primitives
-export const optBigint = z.bigint().optional()
+export const optBigInt = z.bigInt().optional()
 export const optInt = z.int().optional()
 export const optDate = z.date().optional()
 export const optEmail = z.email().optional()
@@ -55,7 +55,7 @@ export const nullableBool = z.boolean().nullable()
 export const nullableNumber = z.number().nullable()
 
 // zod nullable primitives
-export const nullableBigint = z.bigint().nullable()
+export const nullableBigInt = z.bigInt().nullable()
 export const nullableInt = z.int().nullable()
 export const nullableDate = z.date().nullable()
 export const nullableEmail = z.email().nullable()
@@ -72,7 +72,7 @@ export const nullishBool = z.boolean().nullish()
 export const nullishNumber = z.number().nullish()
 
 // zod nullish primitives
-export const nullishBigint = z.bigint().nullish()
+export const nullishBigInt = z.bigInt().nullish()
 export const nullishInt = z.int().nullish()
 export const nullishDate = z.date().nullish()
 export const nullishEmail = z.email().nullish()
@@ -90,7 +90,7 @@ export const objHeight1 = z.object({
   bool_,
   number_,
   null_,
-  bigint_,
+  bigInt_,
   int_,
   date_,
   email_,
@@ -105,7 +105,7 @@ export const objHeight1 = z.object({
   optBool,
   optNumber,
   optNull,
-  optBigint,
+  optBigInt,
   optInt,
   optDate,
   optEmail,
@@ -115,7 +115,7 @@ export const objHeight1 = z.object({
   nullableString,
   nullableBool,
   nullableNumber,
-  nullableBigint,
+  nullableBigInt,
   nullableInt,
   nullableDate,
   nullableEmail,
@@ -125,7 +125,7 @@ export const objHeight1 = z.object({
   nullishString,
   nullishBool,
   nullishNumber,
-  nullishBigint,
+  nullishBigInt,
   nullishInt,
   nullishDate,
   nullishEmail,
@@ -155,7 +155,7 @@ export const arrNumber = z.array(number_)
 export const arrNull = z.array(null_)
 
 // zod array primitives
-export const arrBigint = z.array(bigint_)
+export const arrBigInt = z.array(bigInt_)
 export const arrInt = z.array(int_)
 export const arrDate = z.array(date_)
 export const arrEmail = z.array(email_)
@@ -176,7 +176,7 @@ export const optArrNumber = z.array(number_).optional()
 export const optArrNull = z.array(null_).optional()
 
 // zod optional array primitives
-export const optArrBigint = z.array(bigint_).optional()
+export const optArrBigInt = z.array(bigInt_).optional()
 export const optArrInt = z.array(int_).optional()
 export const optArrDate = z.array(date_).optional()
 export const optArrEmail = z.array(email_).optional()
@@ -192,7 +192,7 @@ export const nullableArrBool = z.array(bool_).nullable()
 export const nullableArrNumber = z.array(number_).nullable()
 
 // zod nullable array primitives
-export const nullableArrBigint = z.array(bigint_).nullable()
+export const nullableArrBigInt = z.array(bigInt_).nullable()
 export const nullableArrInt = z.array(int_).nullable()
 export const nullableArrDate = z.array(date_).nullable()
 export const nullableArrEmail = z.array(email_).nullable()
@@ -208,7 +208,7 @@ export const nullishArrBool = z.array(bool_).nullish()
 export const nullishArrNumber = z.array(number_).nullish()
 
 // zod nullish array primitives
-export const nullishArrBigint = z.array(bigint_).nullish()
+export const nullishArrBigInt = z.array(bigInt_).nullish()
 export const nullishArrInt = z.array(int_).nullish()
 export const nullishArrDate = z.array(date_).nullish()
 export const nullishArrEmail = z.array(email_).nullish()

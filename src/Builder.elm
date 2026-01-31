@@ -50,7 +50,7 @@ typeAnnotationAttrs =
     , Ast.onFloat Type.float
     , Ast.onBool Type.bool
     , Ast.onAny GE.annotation_.value
-    , Ast.onBigint Gen.BigInt.annotation_.bigInt
+    , Ast.onBigInt Gen.BigInt.annotation_.bigInt
     , Ast.onNullableOrOptionalFlat Type.maybe
     , Ast.onArray (always (Maybe.map Type.list))
     , Ast.onObject
@@ -89,7 +89,7 @@ decoderExprAttrs =
     , Ast.onFloat GD.float
     , Ast.onBool GD.bool
     , Ast.onAny GD.value
-    , Ast.onBigint <|
+    , Ast.onBigInt <|
         GD.oneOf
             [ GD.map Gen.BigInt.call_.fromInt GD.int
 

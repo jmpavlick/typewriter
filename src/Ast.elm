@@ -2,7 +2,7 @@ module Ast exposing
     ( Decl, Value(..)
     , decoder
     , Props
-    , Attr, onString, onInt, onFloat, onBool, onAny, onBigint, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Attr, onString, onInt, onFloat, onBool, onAny, onBigInt, onOptional, onNullable, onArray, onObject, onUnimplemented
     , onNullableOrOptionalFlat, optPara, para
     )
 
@@ -11,7 +11,7 @@ module Ast exposing
 @docs Decl, Value
 @docs decoder
 @docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onBigint, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onBigInt, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
 
 -}
 
@@ -35,7 +35,7 @@ type Value
     | SFloat
     | SBool
     | SAny
-    | SBigint
+    | SBigInt
     | SOptional Value
     | SNullable Value
     | SArray Value
@@ -51,7 +51,7 @@ type alias Props a =
     , sFloat : a
     , sBool : a
     , sAny : a
-    , sBigint : a
+    , sBigInt : a
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
@@ -83,8 +83,8 @@ para props value =
         SAny ->
             props.sAny
 
-        SBigint ->
-            props.sBigint
+        SBigInt ->
+            props.sBigInt
 
         SOptional inner ->
             props.sOptional inner (para props inner)
@@ -124,7 +124,7 @@ optPara attrs =
             , sFloat = Nothing
             , sBool = Nothing
             , sAny = Nothing
-            , sBigint = Nothing
+            , sBigInt = Nothing
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
@@ -166,9 +166,9 @@ onAny value base =
 
 
 {-| -}
-onBigint : a -> Attr a
-onBigint value base =
-    { base | sBigint = Just value }
+onBigInt : a -> Attr a
+onBigInt value base =
+    { base | sBigInt = Just value }
 
 
 {-| -}
@@ -271,7 +271,7 @@ decodeHelp =
                         D.succeed SAny
 
                     "bigint" ->
-                        D.succeed SBigint
+                        D.succeed SBigInt
 
                     "optional" ->
                         D.map SOptional <|
