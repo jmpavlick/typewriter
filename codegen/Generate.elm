@@ -53,7 +53,15 @@ main =
 
                 errModule =
                     (\f ->
-                        if List.length errs > 0 then
+                        let
+                            errsLen =
+                                List.length errs
+                        in
+                        if errsLen > 0 then
+                            let
+                                _ =
+                                    Debug.log "Codegen errors" errsLen
+                            in
                             Just f
 
                         else
@@ -69,15 +77,6 @@ main =
                                         Elm.declaration typeName Elm.Declare.placeholder
                                 )
                                 errs
-
-                _ =
-                    (if List.length errs > 0 then
-                        Debug.log "errors"
-
-                     else
-                        identity
-                    )
-                        errs
             in
             files ++ Maybe.Extra.toList errModule
         )

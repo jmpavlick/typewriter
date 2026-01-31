@@ -8,7 +8,9 @@
         },
         "local": [
             "lib/Json/Decode/Ext.elm",
-            "lib/Elm/Ext.elm"
+            "lib/Elm/Ext.elm",
+            "lib/BigInt/Ext.elm",
+            "lib/Url/Ext.elm"
         ]
     }
 }

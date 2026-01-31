@@ -96,6 +96,7 @@ const toZodSchemas = (module: unknown): ResultAsync<ZodDecls, unknown> =>
     .whenFalse(errAsync(`Dynamic import failed; module contains no exports`))(module)
     .andThen(zx.parseResultAsync(zodDeclsSchema))
 
+// turn it in to input for elm-codegen
 const toElmCodegenInput =
   (relativeInputPath: string) =>
   (zsd: ZodDecls): { outputModulePath: string[]; decls: ZodDecls } => {
@@ -111,10 +112,24 @@ const toElmCodegenInput =
     return { outputModulePath, decls: zsd }
   }
 
+const debugWriteElmCodegenInput =
+  (config: Config) =>
+  ({ decls }: { decls: ZodDecls }): ResultAsync<void, unknown> =>
+    okAsync()
+      .andThen(
+        Result.fromThrowable(() =>
+          fs.writeFileSync(
+            `${config.workdirPath}/${config.input.rel}.json`,
+            JSON.stringify(decls, null, 2)
+          )
+        )
+      )
+      .map(() => {})
+
 // run elm-codegen
 const toElmCodegenExec =
   ({ debug, cwd, generatorModulePath, outdir }: ElmCodegenConfig, cleanFirst: boolean) =>
-  (input: { outputModulePath: string[]; decls: ZodDecls }) =>
+  (input: { outputModulePath: string[]; decls: ZodDecls }): ResultAsync<void, unknown> =>
     okAsync()
       .andThrough(() => {
         if (cleanFirst) {
@@ -128,14 +143,15 @@ const toElmCodegenExec =
         return okAsync()
       })
       .andThrough(Result.fromThrowable(() => fs.mkdirSync(outdir, { recursive: true })))
-      .andThen(
-        Result.fromThrowable(() =>
+      .andThen(() =>
+        fromPromise(
           ElmCodegen.run(generatorModulePath, {
             debug,
             output: outdir,
             flags: input as unknown as any,
             cwd,
-          })
+          }),
+          (e) => e
         )
       )
 
@@ -144,6 +160,7 @@ const run = (config: Config) =>
   read(config.input.path)
     .andThen(toZodSchemas)
     .map(toElmCodegenInput(config.input.rel))
+    .andThrough(debugWriteElmCodegenInput(config))
     .andThen(toElmCodegenExec(config.elmCodegenConfig, config.cleanFirst))
 
 // for dev testing, just do it

@@ -6,6 +6,7 @@ import Elm
 import Elm.Annotation as Type
 import Elm.Ext exposing (pipeline)
 import Gen.BigInt
+import Gen.BigInt.Ext
 import Gen.Json.Decode as GD
 import Gen.Json.Decode.Ext as GDE
 import Gen.Json.Encode as GE
@@ -89,12 +90,7 @@ decoderExprAttrs =
     , Ast.onFloat GD.float
     , Ast.onBool GD.bool
     , Ast.onAny GD.value
-    , Ast.onBigInt <|
-        GD.oneOf
-            [ GD.map Gen.BigInt.call_.fromInt GD.int
-
-            -- TODO: figure out how to do case exprs in elm-codegen
-            ]
+    , Ast.onBigInt Gen.BigInt.Ext.decoder
     , Ast.onNullableOrOptionalFlat
         (\dec ->
             GD.oneOf
