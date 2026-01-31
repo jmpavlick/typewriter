@@ -180,7 +180,7 @@ onBigInt value base =
 {-| -}
 onUrl : a -> Attr a
 onUrl value base =
-    { base | sBigInt = Just value }
+    { base | sUrl = Just value }
 
 
 {-| -}
