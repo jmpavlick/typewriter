@@ -65,7 +65,7 @@ const toConfig = ({
 
 const config = toConfig({
   root: ".",
-  relativeInputPath: "tests/schemaVariants.ts",
+  relativeInputPath: "tests/schemaVariantsUrlOnly.ts",
   elmCodegenParams: {
     relativeGeneratorModulePath: "codegen/Generate.elm",
     relativeOutdir: "./generated",

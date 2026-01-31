@@ -4,7 +4,9 @@
         "packages": {
             "elm/core": "1.0.5",
             "elm/json": "1.1.4",
-            "cmditch/elm-bigint": "2.1.2"
+            "cmditch/elm-bigint": "2.1.2",
+            "elm/url": "1.0.0",
+            "elm/time": "1.0.0"
         },
         "local": [
             "lib/Json/Decode/Ext.elm",

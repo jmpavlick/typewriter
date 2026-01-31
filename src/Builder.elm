@@ -10,6 +10,9 @@ import Gen.BigInt.Ext
 import Gen.Json.Decode as GD
 import Gen.Json.Decode.Ext as GDE
 import Gen.Json.Encode as GE
+import Gen.Time
+import Gen.Url
+import Gen.Url.Ext
 import List.Ext
 import String.Extra
 
@@ -52,6 +55,7 @@ typeAnnotationAttrs =
     , Ast.onBool Type.bool
     , Ast.onAny GE.annotation_.value
     , Ast.onBigInt Gen.BigInt.annotation_.bigInt
+    , Ast.onUrl Gen.Url.annotation_.url
     , Ast.onNullableOrOptionalFlat Type.maybe
     , Ast.onArray (always (Maybe.map Type.list))
     , Ast.onObject
@@ -91,6 +95,7 @@ decoderExprAttrs =
     , Ast.onBool GD.bool
     , Ast.onAny GD.value
     , Ast.onBigInt Gen.BigInt.Ext.decoder
+    , Ast.onUrl Gen.Url.Ext.decoder
     , Ast.onNullableOrOptionalFlat
         (\dec ->
             GD.oneOf

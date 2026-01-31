@@ -2,7 +2,7 @@ module Ast exposing
     ( Decl, Value(..)
     , decoder
     , Props
-    , Attr, onString, onInt, onFloat, onBool, onAny, onBigInt, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Attr, onString, onInt, onFloat, onBool, onAny, onBigInt, onUrl, onOptional, onNullable, onArray, onObject, onUnimplemented
     , onNullableOrOptionalFlat, optPara, para
     )
 
@@ -11,7 +11,7 @@ module Ast exposing
 @docs Decl, Value
 @docs decoder
 @docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onBigInt, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onBigInt, onUrl, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
 
 -}
 
@@ -35,6 +35,7 @@ type Value
     | SFloat
     | SBool
     | SAny
+    | SUrl
     | SBigInt
     | SOptional Value
     | SNullable Value
@@ -52,6 +53,7 @@ type alias Props a =
     , sBool : a
     , sAny : a
     , sBigInt : a
+    , sUrl : a
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
@@ -85,6 +87,9 @@ para props value =
 
         SBigInt ->
             props.sBigInt
+
+        SUrl ->
+            props.sUrl
 
         SOptional inner ->
             props.sOptional inner (para props inner)
@@ -125,6 +130,7 @@ optPara attrs =
             , sBool = Nothing
             , sAny = Nothing
             , sBigInt = Nothing
+            , sUrl = Nothing
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
@@ -168,6 +174,12 @@ onAny value base =
 {-| -}
 onBigInt : a -> Attr a
 onBigInt value base =
+    { base | sBigInt = Just value }
+
+
+{-| -}
+onUrl : a -> Attr a
+onUrl value base =
     { base | sBigInt = Just value }
 
 
@@ -239,55 +251,88 @@ decoder =
     D.lazy (always decodeHelp)
 
 
+
+-- D.lazy (always justDecodeUrl)
+
+
+justDecodeUrl : Decoder Value
+justDecodeUrl =
+    D.oneOf
+        [ D.field "format" D.string
+            |> D.andThen
+                (\format ->
+                    case format of
+                        "url" ->
+                            D.succeed SUrl
+
+                        _ ->
+                            D.fail "not covered under the `format` prop; trying other decoders"
+                )
+        , D.succeed (SUnimplemented "something that isn't a URL")
+        ]
+
+
 decodeHelp : Decoder Value
 decodeHelp =
-    D.field "type" D.string
-        |> D.andThen
-            (\type_ ->
-                case type_ of
-                    "string" ->
-                        D.succeed SString
+    D.oneOf
+        [ D.field "format" D.string
+            |> D.andThen
+                (\format ->
+                    case format of
+                        "url" ->
+                            D.succeed SUrl
 
-                    "number" ->
-                        D.field "isInt" D.bool
-                            |> D.map
-                                (\isInt ->
-                                    if isInt then
-                                        SInt
+                        _ ->
+                            D.fail "not covered under the `format` prop; trying other decoders"
+                )
+        , D.field "type" D.string
+            |> D.andThen
+                (\type_ ->
+                    case type_ of
+                        "string" ->
+                            D.succeed SString
 
-                                    else
-                                        SFloat
-                                )
+                        "number" ->
+                            D.field "isInt" D.bool
+                                |> D.map
+                                    (\isInt ->
+                                        if isInt then
+                                            SInt
 
-                    "object" ->
-                        D.map SObject <|
-                            D.at [ "def", "shape" ] <|
-                                D.dict decoder
+                                        else
+                                            SFloat
+                                    )
 
-                    "boolean" ->
-                        D.succeed SBool
+                        "object" ->
+                            D.map SObject <|
+                                D.at [ "def", "shape" ] <|
+                                    D.dict decoder
 
-                    "any" ->
-                        D.succeed SAny
+                        "boolean" ->
+                            D.succeed SBool
 
-                    "bigint" ->
-                        D.succeed SBigInt
+                        "any" ->
+                            D.succeed SAny
 
-                    "optional" ->
-                        D.map SOptional <|
-                            D.at [ "def", "innerType" ] decoder
+                        "bigint" ->
+                            D.succeed SBigInt
 
-                    "nullable" ->
-                        D.map SNullable <|
-                            D.at [ "def", "innerType" ] decoder
+                        "optional" ->
+                            D.map SOptional <|
+                                D.at [ "def", "innerType" ] decoder
 
-                    "array" ->
-                        D.map SArray <|
-                            D.field "element" decoder
+                        "nullable" ->
+                            D.map SNullable <|
+                                D.at [ "def", "innerType" ] decoder
 
-                    _ ->
-                        -- eventually we may handle more of zod's types
-                        -- just getting us up and moving with MVP for now;
-                        -- adding additional handlers will be trivial
-                        D.succeed <| SUnimplemented type_
-            )
+                        "array" ->
+                            D.map SArray <|
+                                D.field "element" decoder
+
+                        _ ->
+                            -- eventually we may handle more of zod's types
+                            -- just getting us up and moving with MVP for now;
+                            -- adding additional handlers will be trivial
+                            D.succeed <| SUnimplemented type_
+                )
+        ]
