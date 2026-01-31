@@ -2,7 +2,7 @@ module Ast exposing
     ( Decl, Value(..)
     , decoder
     , Props
-    , Attr, onString, onInt, onFloat, onBool, onAny, onUnknown, onBigInt, onUrl, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Attr, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onBigInt, onUrl, onOptional, onNullable, onArray, onObject, onUnimplemented
     , onNullableOrOptionalFlat, optPara, para
     )
 
@@ -11,7 +11,7 @@ module Ast exposing
 @docs Decl, Value
 @docs decoder
 @docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onUnknown, onBigInt, onUrl, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onBigInt, onUrl, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
 
 -}
 
@@ -36,6 +36,7 @@ type Value
     | SBool
     | SAny
     | SUnknown
+    | SVoid
     | SUrl
     | SBigInt
     | SOptional Value
@@ -54,6 +55,7 @@ type alias Props a =
     , sBool : a
     , sAny : a
     , sUnknown : a
+    , sVoid : a
     , sBigInt : a
     , sUrl : a
     , sOptional : Value -> a -> a
@@ -89,6 +91,9 @@ para props value =
 
         SUnknown ->
             props.sUnknown
+
+        SVoid ->
+            props.sVoid
 
         SBigInt ->
             props.sBigInt
@@ -135,6 +140,7 @@ optPara attrs =
             , sBool = Nothing
             , sAny = Nothing
             , sUnknown = Nothing
+            , sVoid = Nothing
             , sBigInt = Nothing
             , sUrl = Nothing
             , sOptional = \_ _ -> Nothing
@@ -181,6 +187,12 @@ onAny value base =
 onUnknown : a -> Attr a
 onUnknown value base =
     { base | sUnknown = Just value }
+
+
+{-| -}
+onVoid : a -> Attr a
+onVoid value base =
+    { base | sVoid = Just value }
 
 
 {-| -}
@@ -328,6 +340,9 @@ decodeHelp =
 
                         "unknown" ->
                             D.succeed SUnknown
+
+                        "void" ->
+                            D.succeed SVoid
 
                         "bigint" ->
                             D.succeed SBigInt

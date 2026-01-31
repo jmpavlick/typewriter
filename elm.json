@@ -19,7 +19,8 @@
             "elmcraft/core-extra": "2.2.0",
             "jmpavlick/q": "1.1.0",
             "justinmimbs/date": "4.1.0",
-            "mdgriffith/elm-codegen": "6.0.1"
+            "mdgriffith/elm-codegen": "6.0.1",
+            "rtfeldman/elm-iso8601-date-strings": "1.1.4"
         },
         "indirect": {
             "elm/parser": "1.1.0",
