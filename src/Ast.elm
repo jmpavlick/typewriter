@@ -2,7 +2,7 @@ module Ast exposing
     ( Decl, Value(..)
     , decoder
     , Props
-    , Attr, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onBigInt, onUrl, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Attr, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onUndefined, onNull, onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime, onOptional, onNullable, onArray, onObject, onUnimplemented
     , onNullableOrOptionalFlat, optPara, para
     )
 
@@ -11,7 +11,7 @@ module Ast exposing
 @docs Decl, Value
 @docs decoder
 @docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onBigInt, onUrl, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onUndefined, onNull, onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
 
 -}
 
@@ -37,8 +37,13 @@ type Value
     | SAny
     | SUnknown
     | SVoid
+    | SUndefined
+    | SNull
     | SUrl
     | SBigInt
+    | SIsoTime
+    | SIsoDate
+    | SDateTime
     | SOptional Value
     | SNullable Value
     | SArray Value
@@ -56,8 +61,13 @@ type alias Props a =
     , sAny : a
     , sUnknown : a
     , sVoid : a
+    , sUndefined : a
+    , sNull : a
     , sBigInt : a
     , sUrl : a
+    , sIsoTime : a
+    , sIsoDate : a
+    , sDateTime : a
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
@@ -95,11 +105,26 @@ para props value =
         SVoid ->
             props.sVoid
 
+        SUndefined ->
+            props.sUndefined
+
+        SNull ->
+            props.sNull
+
         SBigInt ->
             props.sBigInt
 
         SUrl ->
             props.sUrl
+
+        SIsoTime ->
+            props.sIsoTime
+
+        SIsoDate ->
+            props.sIsoDate
+
+        SDateTime ->
+            props.sDateTime
 
         SOptional inner ->
             props.sOptional inner (para props inner)
@@ -141,8 +166,13 @@ optPara attrs =
             , sAny = Nothing
             , sUnknown = Nothing
             , sVoid = Nothing
+            , sUndefined = Nothing
+            , sNull = Nothing
             , sBigInt = Nothing
             , sUrl = Nothing
+            , sIsoTime = Nothing
+            , sIsoDate = Nothing
+            , sDateTime = Nothing
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
@@ -196,6 +226,18 @@ onVoid value base =
 
 
 {-| -}
+onUndefined : a -> Attr a
+onUndefined value base =
+    { base | sUndefined = Just value }
+
+
+{-| -}
+onNull : a -> Attr a
+onNull value base =
+    { base | sNull = Just value }
+
+
+{-| -}
 onBigInt : a -> Attr a
 onBigInt value base =
     { base | sBigInt = Just value }
@@ -205,6 +247,24 @@ onBigInt value base =
 onUrl : a -> Attr a
 onUrl value base =
     { base | sUrl = Just value }
+
+
+{-| -}
+onIsoTime : a -> Attr a
+onIsoTime value base =
+    { base | sIsoTime = Just value }
+
+
+{-| -}
+onIsoDate : a -> Attr a
+onIsoDate value base =
+    { base | sIsoDate = Just value }
+
+
+{-| -}
+onDateTime : a -> Attr a
+onDateTime value base =
+    { base | sDateTime = Just value }
 
 
 {-| -}
@@ -306,6 +366,16 @@ decodeHelp =
                         "url" ->
                             D.succeed SUrl
 
+                        "date" ->
+                            D.succeed SIsoDate
+
+                        "time" ->
+                            D.succeed SIsoTime
+
+                        "datetime" ->
+                            -- ISO datetime-formatted string
+                            D.succeed SDateTime
+
                         _ ->
                             D.fail "not covered under the `format` prop; trying other decoders"
                 )
@@ -313,6 +383,10 @@ decodeHelp =
             |> D.andThen
                 (\type_ ->
                     case type_ of
+                        "date" ->
+                            -- JavaScript `Date` object
+                            D.succeed SDateTime
+
                         "string" ->
                             D.succeed SString
 
@@ -343,6 +417,12 @@ decodeHelp =
 
                         "void" ->
                             D.succeed SVoid
+
+                        "undefined" ->
+                            D.succeed SUndefined
+
+                        "null" ->
+                            D.succeed SNull
 
                         "bigint" ->
                             D.succeed SBigInt

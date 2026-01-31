@@ -56,6 +56,8 @@ typeAnnotationAttrs =
     , Ast.onAny GE.annotation_.value
     , Ast.onUnknown GE.annotation_.value
     , Ast.onVoid Type.unit
+    , Ast.onUndefined Type.unit
+    , Ast.onNull Type.unit
     , Ast.onBigInt Gen.BigInt.annotation_.bigInt
     , Ast.onUrl Gen.Url.annotation_.url
     , Ast.onNullableOrOptionalFlat Type.maybe
@@ -98,6 +100,8 @@ decoderExprAttrs =
     , Ast.onAny GD.value
     , Ast.onUnknown GD.value
     , Ast.onVoid (GD.succeed Elm.unit)
+    , Ast.onUndefined (GD.succeed Elm.unit)
+    , Ast.onNull (GD.succeed Elm.unit)
     , Ast.onBigInt Gen.BigInt.Ext.decoder
     , Ast.onUrl Gen.Url.Ext.decoder
     , Ast.onNullableOrOptionalFlat
