@@ -18,6 +18,7 @@
             "elm/url": "1.0.0",
             "elmcraft/core-extra": "2.2.0",
             "jmpavlick/q": "1.1.0",
+            "justinmimbs/date": "4.1.0",
             "mdgriffith/elm-codegen": "6.0.1"
         },
         "indirect": {

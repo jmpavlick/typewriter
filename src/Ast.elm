@@ -2,7 +2,7 @@ module Ast exposing
     ( Decl, Value(..)
     , decoder
     , Props
-    , Attr, onString, onInt, onFloat, onBool, onAny, onBigInt, onUrl, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Attr, onString, onInt, onFloat, onBool, onAny, onUnknown, onBigInt, onUrl, onOptional, onNullable, onArray, onObject, onUnimplemented
     , onNullableOrOptionalFlat, optPara, para
     )
 
@@ -11,7 +11,7 @@ module Ast exposing
 @docs Decl, Value
 @docs decoder
 @docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onBigInt, onUrl, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onUnknown, onBigInt, onUrl, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
 
 -}
 
@@ -35,6 +35,7 @@ type Value
     | SFloat
     | SBool
     | SAny
+    | SUnknown
     | SUrl
     | SBigInt
     | SOptional Value
@@ -52,6 +53,7 @@ type alias Props a =
     , sFloat : a
     , sBool : a
     , sAny : a
+    , sUnknown : a
     , sBigInt : a
     , sUrl : a
     , sOptional : Value -> a -> a
@@ -84,6 +86,9 @@ para props value =
 
         SAny ->
             props.sAny
+
+        SUnknown ->
+            props.sUnknown
 
         SBigInt ->
             props.sBigInt
@@ -129,6 +134,7 @@ optPara attrs =
             , sFloat = Nothing
             , sBool = Nothing
             , sAny = Nothing
+            , sUnknown = Nothing
             , sBigInt = Nothing
             , sUrl = Nothing
             , sOptional = \_ _ -> Nothing
@@ -169,6 +175,12 @@ onBool value base =
 onAny : a -> Attr a
 onAny value base =
     { base | sAny = Just value }
+
+
+{-| -}
+onUnknown : a -> Attr a
+onUnknown value base =
+    { base | sUnknown = Just value }
 
 
 {-| -}
@@ -313,6 +325,9 @@ decodeHelp =
 
                         "any" ->
                             D.succeed SAny
+
+                        "unknown" ->
+                            D.succeed SUnknown
 
                         "bigint" ->
                             D.succeed SBigInt

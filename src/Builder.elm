@@ -54,6 +54,7 @@ typeAnnotationAttrs =
     , Ast.onFloat Type.float
     , Ast.onBool Type.bool
     , Ast.onAny GE.annotation_.value
+    , Ast.onUnknown GE.annotation_.value
     , Ast.onBigInt Gen.BigInt.annotation_.bigInt
     , Ast.onUrl Gen.Url.annotation_.url
     , Ast.onNullableOrOptionalFlat Type.maybe
@@ -94,6 +95,7 @@ decoderExprAttrs =
     , Ast.onFloat GD.float
     , Ast.onBool GD.bool
     , Ast.onAny GD.value
+    , Ast.onUnknown GD.value
     , Ast.onBigInt Gen.BigInt.Ext.decoder
     , Ast.onUrl Gen.Url.Ext.decoder
     , Ast.onNullableOrOptionalFlat
