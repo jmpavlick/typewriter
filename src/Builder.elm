@@ -7,6 +7,9 @@ import Elm.Annotation as Type
 import Elm.Ext exposing (pipeline)
 import Gen.BigInt
 import Gen.BigInt.Ext
+import Gen.Date
+import Gen.Date.Ext
+import Gen.Iso8601
 import Gen.Javascript
 import Gen.Json.Decode as GD
 import Gen.Json.Decode.Ext as GDE
@@ -50,7 +53,8 @@ build path ( moduleName, typedef ) =
 
 typeAnnotationAttrs : List (Ast.Attr Type.Annotation)
 typeAnnotationAttrs =
-    [ Ast.onString Type.string
+    [ -- leaves
+      Ast.onString Type.string
     , Ast.onInt Type.int
     , Ast.onFloat Type.float
     , Ast.onBool Type.bool
@@ -62,6 +66,10 @@ typeAnnotationAttrs =
     , Ast.onNaN Gen.Javascript.annotation_.naN
     , Ast.onBigInt Gen.BigInt.annotation_.bigInt
     , Ast.onUrl Gen.Url.annotation_.url
+    , Ast.onDateTime Gen.Time.annotation_.posix
+    , Ast.onIsoDate Gen.Date.annotation_.date
+
+    -- nodes
     , Ast.onNullableOrOptionalFlat Type.maybe
     , Ast.onArray (always (Maybe.map Type.list))
     , Ast.onObject
@@ -95,7 +103,8 @@ toTypeDecl =
 
 decoderExprAttrs : List (Ast.Attr Elm.Expression)
 decoderExprAttrs =
-    [ Ast.onString GD.string
+    [ -- leaves
+      Ast.onString GD.string
     , Ast.onInt GD.int
     , Ast.onFloat GD.float
     , Ast.onBool GD.bool
@@ -107,6 +116,10 @@ decoderExprAttrs =
     , Ast.onNaN Gen.Javascript.nanDecoder
     , Ast.onBigInt Gen.BigInt.Ext.decoder
     , Ast.onUrl Gen.Url.Ext.decoder
+    , Ast.onDateTime Gen.Iso8601.decoder
+    , Ast.onIsoDate Gen.Date.Ext.decoder
+
+    -- nodes
     , Ast.onNullableOrOptionalFlat
         (\dec ->
             GD.oneOf
