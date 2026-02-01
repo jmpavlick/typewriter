@@ -1,4 +1,4 @@
-module Generate exposing (main)
+module GenerateZodBindings exposing (main)
 
 {-| -}
 
