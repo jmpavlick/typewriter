@@ -1,17 +1,56 @@
 module Ast exposing
     ( Decl, Value(..)
     , decoder
-    , Props
-    , Attr, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onUndefined, onNull, onNaN, onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Props, Attr
+    , onString, onInt, onFloat, onBool
+    , onAny, onUnknown, onVoid, onUndefined, onNull, onNaN
+    , onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime
+    , onUnimplemented
+    , onOptional, onNullable
+    , onArray, onObject
+    , onUnion
     , onNullableOrOptionalFlat, optPara, para
     )
 
 {-|
 
+
+# Types
+
 @docs Decl, Value
+
+
+# JSON
+
 @docs decoder
-@docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onUndefined, onNull, onNaN, onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
+
+
+# The Blessed Paramorphism (calm down it's just a fancy `fold`)
+
+@docs para optPara
+
+
+# The Glorious F-Algebra (And Its Attribute Band)
+
+@docs Props, Attr
+
+
+## Attributes
+
+
+### Leaf Attributes
+
+@docs onString, onInt, onFloat, onBool
+@docs onAny, onUnknown, onVoid, onUndefined, onNull, onNaN
+@docs onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime
+@docs onUnimplemented
+
+
+### Node Attributes
+
+@docs onOptional, onNullable, onOptionalOrNullableFlat
+@docs onArray, onObject
+@docs onUnion
 
 -}
 
@@ -50,6 +89,7 @@ type Value
     | SNullable Value
     | SArray Value
     | SObject (Dict String Value)
+    | SUnion (Dict String Value)
     | SUnimplemented String
 
 
@@ -75,6 +115,7 @@ type alias Props a =
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
     , sObject : Dict String Value -> Dict String a -> a
+    , sUnion : Dict String Value -> Dict String a -> a
     , sUnimplemented : String -> a
     }
 
@@ -141,6 +182,9 @@ para props value =
         SObject dict ->
             props.sObject dict (Dict.map (\_ v -> para props v) dict)
 
+        SUnion dict ->
+            props.sUnion dict (Dict.map (\_ v -> para props v) dict)
+
         SUnimplemented str ->
             props.sUnimplemented str
 
@@ -181,6 +225,7 @@ optPara attrs =
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
             , sObject = \_ _ -> Nothing
+            , sUnion = \_ _ -> Nothing
             , sUnimplemented = \_ -> Nothing
             }
     in
@@ -330,6 +375,12 @@ onObject fn base =
 
 
 {-| -}
+onUnion : (Dict String Value -> Dict String (Maybe a) -> Maybe a) -> Attr a
+onUnion fn base =
+    { base | sUnion = fn }
+
+
+{-| -}
 onUnimplemented : (String -> Maybe a) -> Attr a
 onUnimplemented fn base =
     { base | sUnimplemented = fn }
@@ -390,11 +441,6 @@ decodeHelp =
                                             SFloat
                                     )
 
-                        "object" ->
-                            D.map SObject <|
-                                D.at [ "def", "shape" ] <|
-                                    D.dict decoder
-
                         "boolean" ->
                             D.succeed SBool
 
@@ -427,9 +473,23 @@ decodeHelp =
                             D.map SNullable <|
                                 D.at [ "def", "innerType" ] decoder
 
+                        "object" ->
+                            D.map SObject <|
+                                D.at [ "def", "shape" ] <|
+                                    D.dict decoder
+
                         "array" ->
                             D.map SArray <|
                                 D.field "element" decoder
+
+                        "union" ->
+                            D.map (\options -> SUnion (Dict.fromList options)) <|
+                                D.field "options" <|
+                                    D.list
+                                        (D.map2 Tuple.pair
+                                            (D.oneOf [ D.field "format" D.string, D.field "type" D.string ])
+                                            decoder
+                                        )
 
                         _ ->
                             -- eventually we may handle more of zod's types

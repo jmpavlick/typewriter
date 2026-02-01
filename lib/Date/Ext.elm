@@ -7,8 +7,12 @@ import Json.Decode as D exposing (Decoder)
 decoder : Decoder Date
 decoder =
     D.andThen
-        (Result.mapErr D.fail
-            << Result.map D.succeed
-            << Date.fromIsoString
+        (\str ->
+            case Date.fromIsoString str of
+                Ok ok ->
+                    D.succeed ok
+
+                Err e ->
+                    D.fail e
         )
         D.string

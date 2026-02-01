@@ -293,3 +293,7 @@ export const simpleUser = z.object({
     theme: z.string(),
   }),
 })
+
+// unions
+
+export const unionOfScalars = z.union([z.string(), z.boolean(), z.number(), z.int()])

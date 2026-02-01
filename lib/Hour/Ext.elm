@@ -7,8 +7,9 @@ import Json.Decode as D exposing (Decoder)
 decoder : Decoder Hour.Time
 decoder =
     D.andThen
-        (Result.mapErr D.fail
-            << Result.map D.succeed
-            << Hour.fromIsoString
+        (\str ->
+            Maybe.withDefault (D.fail ("Invalid ISO time string: " ++ str)) <|
+                Maybe.map D.succeed <|
+                    Hour.fromIsoString str
         )
         D.string
