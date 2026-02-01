@@ -2,7 +2,7 @@ module Ast exposing
     ( Decl, Value(..)
     , decoder
     , Props
-    , Attr, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onUndefined, onNull, onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime, onOptional, onNullable, onArray, onObject, onUnimplemented
+    , Attr, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onUndefined, onNull, onNaN, onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime, onOptional, onNullable, onArray, onObject, onUnimplemented
     , onNullableOrOptionalFlat, optPara, para
     )
 
@@ -11,7 +11,7 @@ module Ast exposing
 @docs Decl, Value
 @docs decoder
 @docs Props, map
-@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onUndefined, onNull, onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
+@docs Attr, optMap, onString, onInt, onFloat, onBool, onAny, onUnknown, onVoid, onUndefined, onNull, onNaN, onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime, onOptional, onNullable, onOptionalOrNullableFlat, onArray, onObject, onUnimplemented
 
 -}
 
@@ -39,6 +39,7 @@ type Value
     | SVoid
     | SUndefined
     | SNull
+    | SNaN
     | SUrl
     | SBigInt
     | SIsoTime
@@ -63,6 +64,7 @@ type alias Props a =
     , sVoid : a
     , sUndefined : a
     , sNull : a
+    , sNaN : a
     , sBigInt : a
     , sUrl : a
     , sIsoTime : a
@@ -110,6 +112,9 @@ para props value =
 
         SNull ->
             props.sNull
+
+        SNaN ->
+            props.sNaN
 
         SBigInt ->
             props.sBigInt
@@ -168,6 +173,7 @@ optPara attrs =
             , sVoid = Nothing
             , sUndefined = Nothing
             , sNull = Nothing
+            , sNaN = Nothing
             , sBigInt = Nothing
             , sUrl = Nothing
             , sIsoTime = Nothing
@@ -235,6 +241,12 @@ onUndefined value base =
 onNull : a -> Attr a
 onNull value base =
     { base | sNull = Just value }
+
+
+{-| -}
+onNaN : a -> Attr a
+onNaN value base =
+    { base | sNaN = Just value }
 
 
 {-| -}
@@ -335,27 +347,6 @@ decoder =
     D.lazy (always decodeHelp)
 
 
-
--- D.lazy (always justDecodeUrl)
-
-
-justDecodeUrl : Decoder Value
-justDecodeUrl =
-    D.oneOf
-        [ D.field "format" D.string
-            |> D.andThen
-                (\format ->
-                    case format of
-                        "url" ->
-                            D.succeed SUrl
-
-                        _ ->
-                            D.fail "not covered under the `format` prop; trying other decoders"
-                )
-        , D.succeed (SUnimplemented "something that isn't a URL")
-        ]
-
-
 decodeHelp : Decoder Value
 decodeHelp =
     D.oneOf
@@ -423,6 +414,9 @@ decodeHelp =
 
                         "null" ->
                             D.succeed SNull
+
+                        "nan" ->
+                            D.succeed SNaN
 
                         "bigint" ->
                             D.succeed SBigInt

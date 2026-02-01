@@ -22,33 +22,43 @@ nanDecoder =
             (\str ->
                 if String.toLower str == "nan" then
                     D.succeed NaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNa
+
                 else
-                    D.fail "Not a string representation of `NaN`
+                    D.fail "Not a string representation of `NaN`"
             )
             D.string
         ]
 
 
-type Void = Void
+type Void
+    = Void
+
 
 voidDecoder : Decoder Void
 voidDecoder =
     D.succeed Void
 
 
-type Undefined = Undefined
+type Undefined
+    = Undefined
+
 
 undefinedDecoder : Decoder Undefined
 undefinedDecoder =
     D.succeed Undefined
 
 
-type alias Unknown = Json.Encode.Value
+type alias Unknown =
+    Json.Encode.Value
 
-type alias Any = Json.Encode.Value
+
+type alias Any =
+    Json.Encode.Value
 
 
-type Null = Null
+type Null
+    = Null
+
 
 nullDecoder : Decoder Null
 nullDecoder =
