@@ -7,7 +7,6 @@ export const any_ = z.any()
 export const void_ = z.void()
 export const nan_ = z.nan()
 export const undefined_ = z.undefined()
-export const symbol_ = z.symbol()
 export const url_ = z.url()
 
 // core primitives
@@ -33,7 +32,6 @@ export const optAny = z.any().optional()
 export const optVoid = z.void().optional()
 export const optNan = z.nan().optional()
 export const optUndefined = z.undefined().optional()
-export const optSymbol = z.symbol().optional()
 
 // core optional primitives
 export const optString = z.string().optional()
@@ -55,7 +53,6 @@ export const optUrl = z.url().optional()
 // category: nullable primitives
 // typescript-specific nullable primitives
 export const nullableUnknown = z.unknown().nullable()
-export const nullableSymbol = z.symbol().nullable()
 
 // core nullable primitives
 export const nullableString = z.string().nullable()
@@ -76,7 +73,6 @@ export const nullableUrl = z.url().nullable()
 // category: nullish primitives
 // typescript-specific nullish primitives
 export const nullishUnknown = z.unknown().nullish()
-export const nullishSymbol = z.symbol().nullish()
 
 // core nullish primitives
 export const nullishString = z.string().nullish()
@@ -101,7 +97,6 @@ export const objHeight1 = z.object({
   void_,
   nan_,
   undefined_,
-  symbol_,
   string_,
   bool_,
   number_,
@@ -120,7 +115,6 @@ export const objHeight1 = z.object({
   optVoid,
   optNan,
   optUndefined,
-  optSymbol,
   optString,
   optBool,
   optNumber,
@@ -135,7 +129,6 @@ export const objHeight1 = z.object({
   optUuid,
   optUrl,
   nullableUnknown,
-  nullableSymbol,
   nullableString,
   nullableBool,
   nullableNumber,
@@ -149,7 +142,6 @@ export const objHeight1 = z.object({
   nullableUuid,
   nullableUrl,
   nullishUnknown,
-  nullishSymbol,
   nullishString,
   nullishBool,
   nullishNumber,
@@ -178,7 +170,6 @@ export const arrAny = z.array(any_)
 export const arrVoid = z.array(void_)
 export const arrNan = z.array(nan_)
 export const arrUndefined = z.array(undefined_)
-export const arrSymbol = z.array(symbol_)
 
 // core array primitives
 export const arrString = z.array(string_)
@@ -203,7 +194,6 @@ export const optArrAny = z.array(any_).optional()
 export const optArrVoid = z.array(void_).optional()
 export const optArrNan = z.array(nan_).optional()
 export const optArrUndefined = z.array(undefined_).optional()
-export const optArrSymbol = z.array(symbol_).optional()
 
 // core optional array primitives
 export const optArrString = z.array(string_).optional()
@@ -224,7 +214,6 @@ export const optArrUrl = z.array(url_).optional()
 
 // typescript-specific nullable array primitives
 export const nullableArrUnknown = z.array(unknown_).nullable()
-export const nullableArrSymbol = z.array(symbol_).nullable()
 
 // core nullable array primitives
 export const nullableArrString = z.array(string_).nullable()
@@ -244,7 +233,6 @@ export const nullableArrUrl = z.array(url_).nullable()
 
 // typescript-specific nullish array primitives
 export const nullishArrUnknown = z.array(unknown_).nullish()
-export const nullishArrSymbol = z.array(symbol_).nullish()
 
 // core nullish array primitives
 export const nullishArrString = z.array(string_).nullish()
