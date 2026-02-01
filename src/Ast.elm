@@ -17,6 +17,7 @@ module Ast exposing
 
 import Dict exposing (Dict)
 import Json.Decode as D exposing (Decoder)
+import Json.Encode
 
 
 
@@ -74,9 +75,6 @@ type alias Props a =
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
     , sObject : Dict String Value -> Dict String a -> a
-
-    -- TODO: how to make this open / recursive
-    -- maybe `String -> (Maybe (a -> a))`
     , sUnimplemented : String -> a
     }
 
