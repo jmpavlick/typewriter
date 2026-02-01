@@ -9,6 +9,8 @@ import Gen.BigInt
 import Gen.BigInt.Ext
 import Gen.Date
 import Gen.Date.Ext
+import Gen.Hour
+import Gen.Hour.Ext
 import Gen.Iso8601
 import Gen.Javascript
 import Gen.Json.Decode as GD
@@ -68,6 +70,7 @@ typeAnnotationAttrs =
     , Ast.onUrl Gen.Url.annotation_.url
     , Ast.onDateTime Gen.Time.annotation_.posix
     , Ast.onIsoDate Gen.Date.annotation_.date
+    , Ast.onIsoTime Gen.Hour.annotation_.time
 
     -- nodes
     , Ast.onNullableOrOptionalFlat Type.maybe
@@ -118,6 +121,7 @@ decoderExprAttrs =
     , Ast.onUrl Gen.Url.Ext.decoder
     , Ast.onDateTime Gen.Iso8601.decoder
     , Ast.onIsoDate Gen.Date.Ext.decoder
+    , Ast.onIsoTime Gen.Hour.Ext.decoder
 
     -- nodes
     , Ast.onNullableOrOptionalFlat

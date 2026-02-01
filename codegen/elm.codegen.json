@@ -8,7 +8,8 @@
             "elm/url": "1.0.0",
             "elm/time": "1.0.0",
             "rtfeldman/elm-iso8601-date-strings": "1.1.4",
-            "justinmimbs/date": "4.1.0"
+            "justinmimbs/date": "4.1.0",
+            "fabiommendes/elm-hour": "1.0.1"
         },
         "local": [
             "lib/Json/Decode/Ext.elm",
@@ -18,7 +19,8 @@
             "lib/Javascript.elm",
             "lib/Javascript.elm",
             "lib/Date/Ext.elm",
-            "lib/Date/Ext.elm"
+            "lib/Date/Ext.elm",
+            "lib/Hour/Ext.elm"
         ]
     }
 }

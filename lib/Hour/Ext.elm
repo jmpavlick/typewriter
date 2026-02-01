@@ -1,14 +1,14 @@
-module Date.Ext exposing (..)
+module Hour.Ext exposing (..)
 
-import Date exposing (Date)
+import Hour
 import Json.Decode as D exposing (Decoder)
 
 
-decoder : Decoder Date
+decoder : Decoder Hour.Time
 decoder =
     D.andThen
         (Result.mapErr D.fail
             << Result.map D.succeed
-            << Date.fromIsoString
+            << Hour.fromIsoString
         )
         D.string
