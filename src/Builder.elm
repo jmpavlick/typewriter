@@ -20,6 +20,7 @@ import Gen.Time
 import Gen.Url
 import Gen.Url.Ext
 import List.Ext
+import Maybe.Extra
 import String.Extra
 
 
@@ -51,6 +52,47 @@ build path ( moduleName, typedef ) =
 
 
 -- TYPE DECLARATIONS
+
+
+type Fragment
+    = Variants (List Elm.Variant)
+    | Annotation Type.Annotation
+
+
+liftAnnotationMap : (Type.Annotation -> Type.Annotation) -> (Fragment -> Fragment)
+liftAnnotationMap fn frag =
+    case frag of
+        -- this should be impossible, but Elm has no GADTs
+        -- so our play here is to make the impossible state im--
+        --
+        -- no wait a minute, what if we have, like
+        -- type State = On | Off
+        -- type alias Switch { name : String, state : State }
+        --
+        -- we're going to have to describe a tree for these fucking things aren't we
+        --
+        -- maybe not
+        -- read this convo with miniBill:
+        -- https://discord.com/channels/534524278847045633/892059254356332554/1467515610333315276
+        --
+        Variants _ ->
+            Annotation <| Type.named [] "Never"
+
+        Annotation ta ->
+            Annotation (fn ta)
+
+
+liftOptAnnotationMap : (Maybe Type.Annotation -> Maybe Type.Annotation) -> (Maybe Fragment -> Maybe Fragment)
+liftOptAnnotationMap fn maybeFrag =
+    case maybeFrag of
+        Just (Variants _) ->
+            Nothing
+
+        Just (Annotation ta) ->
+            Maybe.map Annotation (fn (Just ta))
+
+        Nothing ->
+            Maybe.map Annotation (fn Nothing)
 
 
 typeAnnotationAttrs : List (Ast.Attr Type.Annotation)
@@ -86,6 +128,17 @@ typeAnnotationAttrs =
                     (Just [])
                 |> Maybe.map Type.record
         )
+    , Ast.onUnion
+        (\_ dictOfMaybeAnnotations ->
+            let
+                flat =
+                    Dict.fromList <|
+                        Maybe.Extra.values <|
+                            List.map (\( k, maybeV ) -> Maybe.map (\v -> ( k, v )) maybeV) <|
+                                Dict.toList dictOfMaybeAnnotations
+            in
+            toCustomTypeAnnotation Nothing flat
+        )
     ]
 
 
@@ -98,6 +151,11 @@ toTypeDecl =
                 << Ast.optPara typeAnnotationAttrs
     in
     Result.map (Elm.alias "Value") << toTypeAnnotation
+
+
+toCustomTypeAnnotation : Maybe String -> Dict String Type.Annotation -> Maybe Type.Annotation
+toCustomTypeAnnotation =
+    Debug.todo ""
 
 
 
