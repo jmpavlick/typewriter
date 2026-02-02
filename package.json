@@ -1,7 +1,7 @@
 {
   "name": "@jmpavlick/typewriter",
-  "version": "1.0.0",
-  "description": "",
+  "version": "0.0.1",
+  "description": "Generate Elm types and decoders from Zod schemas",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -26,9 +26,24 @@
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm build"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "elm",
+    "zod",
+    "typescript",
+    "codegen",
+    "elm-codegen",
+    "type-safety"
+  ],
+  "author": "John Pavlick",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jmpavlick/typewriter.git"
+  },
+  "homepage": "https://github.com/jmpavlick/typewriter#readme",
+  "bugs": {
+    "url": "https://github.com/jmpavlick/typewriter/issues"
+  },
   "packageManager": "pnpm@10.10.0",
   "devDependencies": {
     "@types/node": "^25.1.0",
