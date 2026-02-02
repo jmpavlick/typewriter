@@ -7,6 +7,7 @@ import { ResultAsync, okAsync, errAsync } from "neverthrow"
 import path from "path"
 import * as Astify from "./src/astify.js"
 import { doAsync } from "./lib/neverthrow/ext.js"
+import * as fs from "./lib/fs.js"
 
 /** a `Config` describes all of the program's executions; `RunProps` describes a single execution of the program
 
@@ -38,21 +39,31 @@ const toRunPropsEntries = ({
       ...{ ...elmCodegenOverrides },
     }
 
-    return relativeInputPaths.map((rip) => ({
-      label,
-      inputPath: path.join(root, rip),
-      elmCodegenConfig,
-      // TODO: add the debug output path
-      //
-    }))
+    return relativeInputPaths.map((rip) => {
+      const inputPath = path.join(root, rip)
+      const relativeWithoutExt = rip.replace(/\.[^.]+$/, "")
+      const debugZodAstOutputPath = path.join(workdirPath, `${relativeWithoutExt}.json`)
+
+      return {
+        label,
+        inputPath,
+        elmCodegenConfig,
+        debugZodAstOutputPath,
+      }
+    })
   }
 
   return Array.from(Object.entries(sections)).flatMap(fromSection)
 }
 
-const run = ({ label, inputPath, elmCodegenConfig }: RunProps) =>
+const run = ({ label, inputPath, elmCodegenConfig, debugZodAstOutputPath }: RunProps) =>
   doAsync(() => {
     console.log(`section: ${label}\ninput: ${inputPath}`)
   })
     .andThen(() => Astify.execute(inputPath))
+    .andThrough((zodDecls) =>
+      elmCodegenConfig.debug
+        ? fs.writeFile(debugZodAstOutputPath, JSON.stringify(zodDecls, null, 2))
+        : okAsync(undefined)
+    )
     .andThen(ElmCodegen.execute(elmCodegenConfig))
