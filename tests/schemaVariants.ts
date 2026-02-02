@@ -297,3 +297,7 @@ export const simpleUser = z.object({
 // unions
 
 export const unionOfScalars = z.union([z.string(), z.boolean(), z.number(), z.int()])
+
+export const recordInObject = z.object({
+  sections: z.record(z.string(), z.object({ some: z.int(), recordThing: z.string() })),
+})

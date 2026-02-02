@@ -11,7 +11,6 @@ import Elm.Declare
 import Gen.CodeGen.Generate as Generate
 import Json.Decode as D
 import Json.Encode
-import List.Ext
 import Maybe.Extra
 
 
