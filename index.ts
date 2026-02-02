@@ -35,13 +35,14 @@ const toRunPropsEntries = ({
     }
 
     return relativeInputPaths.map((rip) => {
-      const inputPath = path.join(root, rip)
+      const relativeInputPath = rip
       const relativeWithoutExt = rip.replace(/\.[^.]+$/, "")
       const debugZodAstOutputPath = path.join(workdirPath, `${relativeWithoutExt}.json`)
 
       return {
+        root,
         label,
-        inputPath,
+        relativeInputPath,
         elmCodegenConfig,
         debugZodAstOutputPath,
       }

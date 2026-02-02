@@ -1,6 +1,7 @@
 import zx from "../lib/zod/ext.js"
 import z from "zod"
 import { ResultAsync, okAsync, errAsync, Result } from "neverthrow"
+import path from "path"
 
 // Schema for validating that imported module exports are zod schemas
 export const zodDeclsSchema = z.record(z.string(), z.instanceof(z.ZodType))
@@ -21,8 +22,9 @@ const toZodSchemas = (module: unknown): ResultAsync<ZodDecls, unknown> => {
 }
 
 export const execute = (
-  inputPath: string
+  root: string,
+  relativeInputPath: string
 ): ResultAsync<{ outputModulePath: string[]; decls: ZodDecls }, unknown> =>
-  readModule(inputPath)
+  readModule(path.join(root, relativeInputPath))
     .andThen(toZodSchemas)
-    .map((decls) => ({ outputModulePath: inputPath.split("/"), decls }))
+    .map((decls) => ({ outputModulePath: relativeInputPath.replace(".ts", "").split("/"), decls }))
