@@ -6,16 +6,14 @@ const configParams: ConfigParams = {
     tests: {
       relativeInputPaths: ["tests/schemaVariants.ts"],
       relativeOutdir: "generated",
-      elmCodegenOverrides: {
-        cleanFirst: true,
-      },
+      cleanFirst: true,
+      debug: true,
     },
     main: {
       relativeInputPaths: [],
       relativeOutdir: "workerConfig",
-      elmCodegenOverrides: {
-        cleanFirst: true,
-      },
+      cleanFirst: true,
+      debug: true,
     },
   },
 }
