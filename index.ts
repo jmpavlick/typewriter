@@ -132,3 +132,6 @@ if (
 ) {
   execute
 }
+
+// Export types for users
+export type { Config, ConfigParams } from "./src/config.js"

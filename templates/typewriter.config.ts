@@ -1,4 +1,4 @@
-import { type ConfigParams } from "./src/config.js"
+import { type ConfigParams } from "../src/config.js"
 
 const config: ConfigParams = {
   sections: {
