@@ -32,7 +32,7 @@ export const parseJsonSafe = (jsonStr: string) =>
   ResultAsync.fromPromise(Promise.resolve(JSON.parse(jsonStr)), (e) => e)
 
 export const doAsync = <T>(syncExec: () => T): ResultAsync<T, unknown> =>
-  ResultAsync.fromPromise(Promise.resolve(syncExec()), (e) => e)
+  ResultAsync.fromPromise(Promise.resolve().then(syncExec), (e) => e)
 
 export const md5Async = (obj: unknown): ResultAsync<string, unknown> =>
   doAsync(() => crypto.createHash("md5").update(stringify(obj!)).digest("hex"))

@@ -135,19 +135,30 @@ if (
 ) {
   const commandArg = process.argv[2]
 
-  toCommand(commandArg)
+  const result = await toCommand(commandArg)
     .orElse(() => okAsync("generate" as const))
     .andThen((cmd) => {
-      switch (cmd) {
-        case "init":
-          return init()
-        case "generate":
-          return generate
+      const io = () => {
+        switch (cmd) {
+          case "init":
+            return init.andTee(() => {
+              console.log("Init OK, try running npx typewriter generate")
+            })
+          case "generate":
+            return generate
+          default:
+            const _: never = cmd
+            throw new Error(`unsupported command: ${cmd}`)
+        }
       }
+
+      return io()
     })
     .orTee((err) => {
       console.error(err)
     })
+
+  result._unsafeUnwrap()
 }
 
 // Export types for users
