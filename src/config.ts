@@ -47,7 +47,7 @@ export const toConfig = ({
     cleanFirst: false,
     debug: false,
     cwd: path.join(root, "codegen"),
-    generatorModulePath: "GenerateModuleBindings.elm",
+    generatorModulePath: "GenerateZodBindings.elm",
     outdir: "generated",
   }
 
