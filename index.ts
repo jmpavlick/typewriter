@@ -5,12 +5,17 @@ import { ConfigParams, configParams, type Config } from "./src/config.js"
 import * as ElmCodegen from "./lib/elmCodegen.js"
 import path from "path"
 import { type RunProps, run } from "./src/main.js"
-import base from "./src/ouroboros.js"
+import ouroboros from "./src/ouroboros.js"
 import { md5Async, parseJsonSafe } from "./lib/neverthrow/ext.js"
 import * as fs from "./lib/fs.js"
 import { okAsync, ResultAsync } from "neverthrow"
 import stringify from "safe-stable-stringify"
 import { fileURLToPath } from "url"
+
+const base = {
+  ...ouroboros,
+  root: path.resolve(ouroboros.root),
+}
 
 const toRunPropsEntries = ({
   root,
@@ -110,7 +115,9 @@ const execute = compareBaseConfigHashes
   })
 
 // Only run if this is the main module
-if (import.meta.url === `file://${process.argv[1]}` ||
-    fileURLToPath(import.meta.url) === process.argv[1]) {
+if (
+  import.meta.url === `file://${process.argv[1]}` ||
+  fileURLToPath(import.meta.url) === process.argv[1]
+) {
   execute
 }
