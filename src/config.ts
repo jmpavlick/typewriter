@@ -62,8 +62,3 @@ export const toConfig = ({
     userConfigParamsPath: path.join(workdirPath, "configParams.json"),
   }
 }
-
-export const zodDecls = z.record(
-  z.string(),
-  z.custom<z.ZodType>((v) => v instanceof z.ZodType, { error: "Value must be a Zod " })
-)

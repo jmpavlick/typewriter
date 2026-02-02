@@ -4,8 +4,8 @@ import { ResultAsync, okAsync, errAsync, Result } from "neverthrow"
 import path from "path"
 
 // Schema for validating that imported module exports are zod schemas
-export const zodDeclsSchema = z.record(z.string(), z.instanceof(z.ZodType))
-export type ZodDecls = z.infer<typeof zodDeclsSchema>
+export const zodDecls = z.record(z.string(), z.instanceof(z.ZodType))
+export type ZodDecls = z.infer<typeof zodDecls>
 
 // Read a module and extract its exports as a plain object
 const readModule = (filepath: string): ResultAsync<Record<string, unknown>, unknown> =>
@@ -24,7 +24,7 @@ const toZodSchemas = (module: unknown): ResultAsync<ZodDecls, unknown> => {
   if (typeof module !== "object" || module === null) {
     return errAsync(`Dynamic import failed; module contains no exports`)
   }
-  return zx.parseResultAsync(zodDeclsSchema)(module)
+  return zx.parseResultAsync(zodDecls)(module)
 }
 
 export const execute = (inputPath: string): ResultAsync<ZodDecls, unknown> =>
