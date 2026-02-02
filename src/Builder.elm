@@ -117,6 +117,7 @@ typeAnnotationAttrs =
     -- nodes
     , Ast.onNullableOrOptionalFlat Type.maybe
     , Ast.onArray (always (Maybe.map Type.list))
+    , Ast.onRecord (always (Maybe.map <| Type.dict Type.string))
     , Ast.onObject
         (\_ dictOfMaybeAnnotations ->
             dictOfMaybeAnnotations
@@ -191,6 +192,7 @@ decoderExprAttrs =
                 ]
         )
     , Ast.onArray (\_ innerDecoder -> Maybe.map GD.list innerDecoder)
+    , Ast.onRecord (\_ innerDecoder -> Maybe.map GD.dict innerDecoder)
     , Ast.onObject
         (\_ dictOfMaybeDecoders ->
             dictOfMaybeDecoders

@@ -5,7 +5,6 @@ import zx from "./lib/zod/ext.js"
 import { ternary } from "./lib/neverthrow/ext.js"
 import * as fs from "fs"
 import * as path from "path"
-import * as ElmCodegen from "elm-codegen"
 import {
   type Input,
   type ElmCodegenConfig,
@@ -16,6 +15,7 @@ import {
   configParamsSchema,
   zodDeclsSchema,
 } from "./src/schema.js"
+import configParams from "./src/ouroboros.js"
 
 export { configParamsSchema, type ConfigParams, type Config } from "./src/schema.js"
 
@@ -40,32 +40,32 @@ const toElmCodegenConfig =
 
 const toConfig = ({
   root,
-  relativeInputPath,
+  relativeInputPaths,
   elmCodegenParams,
   cleanFirst,
 }: ConfigParams): Config => {
-  const input = toInput(root)(relativeInputPath)
+  const inputs = relativeInputPaths.map(toInput(root))
   return {
     workdirPath: toWorkdirPath(root),
-    input,
+    inputs,
     elmCodegenConfig: toElmCodegenConfig(elmCodegenParams)(root),
     cleanFirst,
   }
 }
 
-const config: Config = toConfig({
-  root: ".",
-  relativeInputPath: "tests/schemaVariants.ts",
-  elmCodegenParams: {
-    relativeGeneratorModulePath: "codegen/GenerateZodBindings.elm",
-    relativeOutdir: "./generated",
-    debug: true,
-  },
-  cleanFirst: true,
-})
+// Config resolution: check for .typewriter/config.json, fallback to ouroboros config
+const getConfig = (): ResultAsync<Config, unknown> => {
+  const ouroborosConfig = toConfig(configParams)
+  const configJsonPath = path.join(ouroborosConfig.workdirPath, "config.json")
 
-// read the input file as a module and do cursed shit to make it more objectionable
-// (pun intended)
+  return fromPromise(fs.promises.readFile(configJsonPath, "utf-8"), () => "config.json not found")
+    .andThen((content) => Result.fromThrowable(() => JSON.parse(content))())
+    .andThen(zx.parseResultAsync(configParamsSchema))
+    .orElse(() => okAsync(configParams))
+    .map(toConfig)
+}
+
+// read the input file as a module and do cursed shit to make it into a typed serialized object
 const read = (filepath: string): ResultAsync<Record<string, unknown>, unknown> =>
   fromPromise(import(filepath), (e) => `Failed to import from filepath: ${e}`).andThen(
     Result.fromThrowable((m) => Object.fromEntries(Object.entries(m)))
@@ -94,13 +94,13 @@ const toElmCodegenInput =
   }
 
 const debugWriteElmCodegenInput =
-  (config: Config) =>
+  (config: Config, inputRel: string) =>
   ({ decls }: { decls: ZodDecls }): ResultAsync<void, unknown> =>
     okAsync()
       .andThen(
         Result.fromThrowable(() =>
           fs.writeFileSync(
-            path.join(config.workdirPath, `${config.input.rel}.json`),
+            path.join(config.workdirPath, `${inputRel}.json`),
             JSON.stringify(decls, null, 2)
           )
         )
@@ -137,16 +137,32 @@ const toElmCodegenExec =
       )
 
 // the chain that fleetwood mac said they'd never break
-const run = (config: Config) =>
-  read(config.input.path)
+const runSingle = (config: Config, input: Input) =>
+  read(input.path)
     .andThen(toZodSchemas)
-    .map(toElmCodegenInput(config.input.rel))
-    .andThrough(debugWriteElmCodegenInput(config))
+    .map(toElmCodegenInput(input.rel))
+    .andThrough(debugWriteElmCodegenInput(config, input.rel))
     .andThen(toElmCodegenExec(config.elmCodegenConfig, config.cleanFirst))
 
+const run = (config: Config): ResultAsync<void[], unknown> =>
+  okAsync(config.inputs).andThen((inputs) =>
+    fromPromise(
+      Promise.all(
+        inputs.map((input) =>
+          runSingle(config, input).match(
+            (ok) => ok,
+            (err) => Promise.reject(err)
+          )
+        )
+      ),
+      (e) => e
+    )
+  )
+
 // for dev testing, just do it
-run(config)
-  .andTee((output) => {
+getConfig()
+  .andThen(run)
+  .andTee(() => {
     console.log("OK")
   })
   .orTee((output) => {

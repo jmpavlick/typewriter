@@ -7,7 +7,7 @@ module Ast exposing
     , onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime
     , onUnimplemented
     , onOptional, onNullable
-    , onArray, onObject
+    , onArray, onRecord, onObject
     , onUnion
     , onNullableOrOptionalFlat, optPara, para
     )
@@ -49,14 +49,13 @@ module Ast exposing
 ### Node Attributes
 
 @docs onOptional, onNullable, onOptionalOrNullableFlat
-@docs onArray, onObject
+@docs onArray, onRecord, onObject
 @docs onUnion
 
 -}
 
 import Dict exposing (Dict)
 import Json.Decode as D exposing (Decoder)
-import Json.Encode
 
 
 
@@ -88,6 +87,7 @@ type Value
     | SOptional Value
     | SNullable Value
     | SArray Value
+    | SRecord (Value)
     | SObject (Dict String Value)
     | SUnion (Dict String Value)
     | SUnimplemented String
@@ -114,6 +114,7 @@ type alias Props a =
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
+    , sRecord : Value -> a -> a
     , sObject : Dict String Value -> Dict String a -> a
     , sUnion : Dict String Value -> Dict String a -> a
     , sUnimplemented : String -> a
@@ -179,8 +180,12 @@ para props value =
         SArray inner ->
             props.sArray inner (para props inner)
 
+        SRecord inner ->
+            props.sArray inner (para props inner)
+
         SObject dict ->
             props.sObject dict (Dict.map (\_ v -> para props v) dict)
+
 
         SUnion dict ->
             props.sUnion dict (Dict.map (\_ v -> para props v) dict)
@@ -224,6 +229,7 @@ optPara attrs =
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
+            , sRecord = \_ -> Nothing
             , sObject = \_ _ -> Nothing
             , sUnion = \_ _ -> Nothing
             , sUnimplemented = \_ -> Nothing
@@ -367,11 +373,17 @@ onArray : (Value -> Maybe a -> Maybe a) -> Attr a
 onArray fn base =
     { base | sArray = fn }
 
+{-| -}
+onRecord : (Value -> Maybe a -> Maybe a) -> Attr a
+onRecord fn base =
+    { base | sRecord = fn }
+
 
 {-| -}
 onObject : (Dict String Value -> Dict String (Maybe a) -> Maybe a) -> Attr a
 onObject fn base =
     { base | sObject = fn }
+
 
 
 {-| -}
@@ -477,6 +489,18 @@ decodeHelp =
                             D.map SObject <|
                                 D.at [ "def", "shape" ] <|
                                     D.dict decoder
+
+                        "record" ->
+                            D.andThen (\keyTypeType ->
+                                if keyTypeType == "string" then
+                                    D.map SRecord <|
+                                        D.at [ "def", "valueType" ] <|
+                                            D.dict decoder
+                                else
+                                    D.fail "Currently, only string-keyed records are supported (sorry, i'll get to it)
+                            )
+                            ( D.at ["def", "keyType", "type" ] D.string
+                            )
 
                         "array" ->
                             D.map SArray <|
