@@ -1,8 +1,6 @@
 import "./lib/serializeErrorPrototype.js"
 import stringify from "safe-stable-stringify"
-import stringifyOrElse from "./lib/stringifyOrElse.js"
 import { type ResultAsync, okAsync, errAsync, fromPromise, Result, ok } from "neverthrow"
-import dedent from "dedent"
 import z from "zod"
 import zx from "./lib/zod/ext.js"
 import { ternary } from "./lib/neverthrow/ext.js"
@@ -84,7 +82,7 @@ const toConfig = ({
   }
 }
 
-const config = toConfig({
+const config: Config = toConfig({
   root: ".",
   relativeInputPath: "tests/schemaVariants.ts",
   elmCodegenParams: {
