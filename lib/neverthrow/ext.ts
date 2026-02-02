@@ -1,4 +1,6 @@
 import { ResultAsync, okAsync, errAsync } from "neverthrow"
+import crypto from "crypto"
+import stringify from "safe-stable-stringify"
 
 export const ternary = <T, E, U = T>(toBoolean: (t: T) => boolean) => {
   const exec =
@@ -29,12 +31,8 @@ export const ternary = <T, E, U = T>(toBoolean: (t: T) => boolean) => {
 export const parseJsonSafe = (jsonStr: string) =>
   ResultAsync.fromPromise(Promise.resolve(JSON.parse(jsonStr)), (e) => e)
 
-export const doAsync = (syncExec: () => void): ResultAsync<void, unknown> =>
-  ResultAsync.fromPromise(
-    (async () => {
-      syncExec()
+export const doAsync = <T>(syncExec: () => T): ResultAsync<T, unknown> =>
+  ResultAsync.fromPromise(Promise.resolve(syncExec()), (e) => e)
 
-      Promise.resolve()
-    })(),
-    (e) => e
-  )
+export const md5Async = (obj: unknown): ResultAsync<string, unknown> =>
+  doAsync(() => crypto.createHash("md5").update(stringify(obj!)).digest("hex"))

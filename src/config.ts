@@ -30,6 +30,8 @@ export const config = z.object({
   workdirPath: z.string(),
   ...configParams.required({ root: true }).shape,
   elmCodegenConfig: ElmCodegen.config,
+  baseConfigMd5Path: z.string(),
+  userConfigParamsPath: z.string(),
 })
 export type Config = z.infer<typeof config>
 
@@ -55,6 +57,8 @@ export const toConfig = ({
     relativeGlobalPrepareScriptPath,
     sections,
     elmCodegenConfig,
+    baseConfigMd5Path: path.join(workdirPath, "baseConfig.md5"),
+    userConfigParamsPath: path.join(workdirPath, "configParams.json"),
   }
 }
 

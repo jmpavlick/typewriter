@@ -10,24 +10,23 @@ export const readFile = (
     (e) => `Failed to read file at ${path}: ${e}`
   )
 
-export const writeFile = (
+export const writeFileUtf8 = (
   path: string,
   content: string,
-  encoding: BufferEncoding = "utf-8"
+  options?: {
+    overwrite?: boolean
+  }
 ): ResultAsync<void, unknown> =>
   ResultAsync.fromPromise(
-    fs.promises.writeFile(path, content, encoding),
+    fs.promises.writeFile(path, content, {
+      encoding: "utf8",
+      flag: options?.overwrite ? "w" : "wx",
+    }),
     (e) => `Failed to write file at ${path}: ${e}`
   )
 
-export const rm = (
-  path: string,
-  options?: fs.RmOptions
-): ResultAsync<void, unknown> =>
-  ResultAsync.fromPromise(
-    fs.promises.rm(path, options),
-    (e) => `Failed to remove ${path}: ${e}`
-  )
+export const rm = (path: string, options?: fs.RmOptions): ResultAsync<void, unknown> =>
+  ResultAsync.fromPromise(fs.promises.rm(path, options), (e) => `Failed to remove ${path}: ${e}`)
 
 export const mkdir = (
   path: string,

@@ -29,7 +29,7 @@ export const run = ({
     .andThen(() => Astify.execute(inputPath))
     .andThrough((zodDecls) =>
       elmCodegenConfig.debug
-        ? fs.writeFile(debugZodAstOutputPath, JSON.stringify(zodDecls, null, 2))
+        ? fs.writeFileUtf8(debugZodAstOutputPath, JSON.stringify(zodDecls, null, 2))
         : okAsync(undefined)
     )
     .andThen(ElmCodegen.execute(elmCodegenConfig))

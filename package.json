@@ -7,7 +7,7 @@
     "dev": "pnpm test:watch",
     "test:elm": "elm-test && test:ts",
     "test:elm:watch": "elm-test --watch",
-    "test:ts": "tsx main.ts",
+    "test:ts": "tsx index.ts",
     "test:ts:watch": "chokidar \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
     "test:watch": "concurrently \"pnpm test:elm:watch\" \"pnpm test:ts:watch\""
   },
@@ -19,15 +19,15 @@
     "@types/node": "^25.1.0",
     "chokidar": "^5.0.0",
     "concurrently": "^9.2.1",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0"
+  },
+  "dependencies": {
+    "typescript": "^5.9.3",
     "elm": "0.19.1-6",
     "elm-codegen": "^0.6.3",
     "elm-test": "0.19.1-revision17",
     "elm-tooling": "^1.17.0",
-    "prettier": "^3.8.1",
-    "tsx": "^4.21.0",
-    "typescript": "^5.9.3"
-  },
-  "dependencies": {
     "dedent": "^1.7.1",
     "neverthrow": "^8.2.0",
     "safe-stable-stringify": "^2.5.0",
