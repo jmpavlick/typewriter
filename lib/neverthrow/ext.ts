@@ -1,24 +1,19 @@
 import { ResultAsync, okAsync, errAsync } from "neverthrow"
 
-
 export const ternary = <T, E, U = T>(toBoolean: (t: T) => boolean) => {
-  const exec = (bindFromTrue: (t: T) => ResultAsync<U, E>) =>
+  const exec =
+    (bindFromTrue: (t: T) => ResultAsync<U, E>) =>
     (bindFromFalse: (t: T) => ResultAsync<U, E>) =>
-     (input: T) => toBoolean(input)
-      ? bindFromTrue(input)
-      :bindFromFalse(input)
+    (input: T) => (toBoolean(input) ? bindFromTrue(input) : bindFromFalse(input))
 
   const liftOk = <V>(value: V | ResultAsync<V, E> | ResultAsync<V, never>) =>
-    value instanceof ResultAsync
-      ? value.mapErr((nvr) => nvr as E)
-      : okAsync<V, E>(value)
-
+    value instanceof ResultAsync ? value.mapErr((nvr) => nvr as E) : okAsync<V, E>(value)
 
   const toWhenFalse = (okThunk: (t: T) => ResultAsync<U, E>) => ({
     whenFalse: (fnOrErr: ResultAsync<never, E> | ((t: T) => U | ResultAsync<U, E | never>)) =>
       typeof fnOrErr === "function"
         ? exec(okThunk)((v) => liftOk(fnOrErr(v)))
-        : fnOrErr as ResultAsync<U, E>
+        : (fnOrErr as ResultAsync<U, E>),
   })
 
   return {
@@ -27,6 +22,19 @@ export const ternary = <T, E, U = T>(toBoolean: (t: T) => boolean) => {
     whenFalse: (fnOrErr: ResultAsync<never, E> | ((t: T) => U | ResultAsync<U, E | never>)) =>
       typeof fnOrErr === "function"
         ? exec((t) => okAsync(t as unknown as U))((v) => liftOk(fnOrErr(v)))
-        : exec((t) => okAsync(t as unknown as U))(() => fnOrErr.map((nvr) => nvr as U))
+        : exec((t) => okAsync(t as unknown as U))(() => fnOrErr.map((nvr) => nvr as U)),
   }
 }
+
+export const parseJsonSafe = (jsonStr: string) =>
+  ResultAsync.fromPromise(Promise.resolve(JSON.parse(jsonStr)), (e) => e)
+
+export const doAsync = (syncExec: () => void): ResultAsync<void, unknown> =>
+  ResultAsync.fromPromise(
+    (async () => {
+      syncExec()
+
+      Promise.resolve()
+    })(),
+    (e) => e
+  )

@@ -5,6 +5,8 @@ import zx from "./lib/zod/ext.js"
 import z from "zod"
 import { ResultAsync, okAsync, errAsync } from "neverthrow"
 import path from "path"
+import * as Astify from "./src/astify.js"
+import { doAsync } from "./lib/neverthrow/ext.js"
 
 /** a `Config` describes all of the program's executions; `RunProps` describes a single execution of the program
 
@@ -14,7 +16,7 @@ const runProps = z.object({
   label: z.string(),
   inputPath: z.string(),
   elmCodegenConfig: ElmCodegen.config,
-  workdirPath: z.string(),
+  debugZodAstOutputPath: z.string(),
 })
 type RunProps = z.infer<typeof runProps>
 
@@ -40,11 +42,17 @@ const toRunPropsEntries = ({
       label,
       inputPath: path.join(root, rip),
       elmCodegenConfig,
-      workdirPath,
+      // TODO: add the debug output path
+      //
     }))
   }
 
   return Array.from(Object.entries(sections)).flatMap(fromSection)
 }
 
-const run = ({ label, inputPath, elmCodegenConfig, workdirPath }: RunProps) => {}
+const run = ({ label, inputPath, elmCodegenConfig }: RunProps) =>
+  doAsync(() => {
+    console.log(`section: ${label}\ninput: ${inputPath}`)
+  })
+    .andThen(() => Astify.execute(inputPath))
+    .andThen(ElmCodegen.execute(elmCodegenConfig))
