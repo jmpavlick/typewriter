@@ -33,6 +33,7 @@ export const run = ({
       elmCodegenConfig.debug
         ? fs.writeFileUtf8(debugZodAstOutputPath, JSON.stringify(zodDecls, null, 2), {
             overwrite: true,
+            mkdirP: true,
           })
         : okAsync(undefined)
     )

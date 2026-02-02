@@ -10,8 +10,8 @@ const configParams: ConfigParams = {
       debug: true,
     },
     main: {
-      relativeInputPaths: [],
-      relativeOutdir: "workerConfig",
+      relativeInputPaths: ["src/config.ts"],
+      relativeOutdir: "platformWorkerConfig",
       cleanFirst: true,
       debug: true,
     },
