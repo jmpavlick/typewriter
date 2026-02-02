@@ -11,10 +11,10 @@ export const config = z.object({
   outdir: z.string(),
   debug: z.boolean(),
 })
-export type config = z.infer<typeof config>
+export type Config = z.infer<typeof config>
 
 export const execute =
-  ({ cleanFirst, cwd, generatorModulePath, outdir, debug }: config) =>
+  ({ cleanFirst, cwd, generatorModulePath, outdir, debug }: Config) =>
   (jsonInput: unknown) => {
     const cleanIO: ResultAsync<void, unknown> = fs.rm(path.join(outdir, "*.elm"), {
       recursive: true,

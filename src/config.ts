@@ -7,14 +7,14 @@ import * as ElmCodegen from "../lib/elmCodegen.js"
 const configParamsSection = z.object({
   relativeInputPaths: z.array(z.string()),
   relativeOutdir: z.string(),
-  cleanFirst: z.boolean(),
   relativePrepareScriptPath: z.string().optional(),
-  elmCodegenOverrides: z
-    .object({
-      relativeGeneratorModulePath: ElmCodegen.config.shape.generatorModulePath.optional(),
-      debug: ElmCodegen.config.shape.debug.optional(),
+  ...ElmCodegen.config
+    .pick({
+      cleanFirst: true,
+      debug: true,
     })
-    .optional(),
+    .partial().shape,
+  elmCodegenOverrides: ElmCodegen.config.pick({ generatorModulePath: true }).partial().optional(),
 })
 
 /** this is the shape of the program's entry point
@@ -28,8 +28,8 @@ export type ConfigParams = z.infer<typeof configParams>
 
 export const config = z.object({
   workdirPath: z.string(),
-  ...configParams.shape,
-  root: z.string(),
+  ...configParams.required({ root: true }).shape,
+  elmCodegenConfig: ElmCodegen.config,
 })
 export type Config = z.infer<typeof config>
 
@@ -41,11 +41,20 @@ export const toConfig = ({
   const root = maybeRoot ?? "."
   const workdirPath = path.join(root, ".typewriter")
 
+  const elmCodegenConfig: ElmCodegen.Config = {
+    cleanFirst: false,
+    debug: false,
+    cwd: root,
+    generatorModulePath: "GenerateModuleBindings.elm",
+    outdir: "generated",
+  }
+
   return {
     root,
     workdirPath,
     relativeGlobalPrepareScriptPath,
     sections,
+    elmCodegenConfig,
   }
 }
 

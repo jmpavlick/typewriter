@@ -3,10 +3,19 @@ import { type ConfigParams, toConfig } from "./config.js"
 const configParams: ConfigParams = {
   root: ".",
   sections: {
-    main: {
+    tests: {
       relativeInputPaths: ["tests/schemaVariants.ts"],
-      relativeOutdir: "./generated",
-      cleanFirst: true,
+      relativeOutdir: "generated",
+      elmCodegenOverrides: {
+        cleanFirst: true,
+      },
+    },
+    main: {
+      relativeInputPaths: [],
+      relativeOutdir: "workerConfig",
+      elmCodegenOverrides: {
+        cleanFirst: true,
+      },
     },
   },
 }
