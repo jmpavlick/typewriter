@@ -2,13 +2,17 @@
   "name": "typewriter",
   "version": "1.0.0",
   "description": "",
+  "type": "module",
   "main": "index.js",
+  "bin": {
+    "typewriter": "./index.js"
+  },
   "scripts": {
     "dev": "pnpm typecheck; pnpm test:watch",
     "test:elm": "elm-test && test:ts",
     "test:elm:watch": "elm-test --watch --no-clear-console",
     "test:ts": "pnpm typecheck && tsx index.ts",
-    "test:ts:watch": "chokidar \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
+    "test:ts:watch": "chokidar \"tsconfig.json\" \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
     "test:watch": "concurrently \"pnpm test:elm:watch\" \"pnpm test:ts:watch\"",
     "typecheck": "tsc --noEmit"
   },

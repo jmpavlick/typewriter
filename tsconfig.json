@@ -2,5 +2,7 @@
   "compilerOptions": {
     "esModuleInterop": true,
     "lib": ["esnext", "dom", "dom.iterable"],
+    "module": "nodenext",
+    "target": "esnext",
   },
 }

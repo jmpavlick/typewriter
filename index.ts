@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 import "./lib/serializeErrorPrototype.js"
 import zx from "./lib/zod/ext.js"
 import { ConfigParams, configParams, type Config } from "./src/config.js"
@@ -9,6 +10,7 @@ import { md5Async, parseJsonSafe } from "./lib/neverthrow/ext.js"
 import * as fs from "./lib/fs.js"
 import { okAsync, ResultAsync } from "neverthrow"
 import stringify from "safe-stable-stringify"
+import { fileURLToPath } from "url"
 
 const toRunPropsEntries = ({
   root,
@@ -107,4 +109,8 @@ const execute = compareBaseConfigHashes
     console.error(err)
   })
 
-execute
+// Only run if this is the main module
+if (import.meta.url === `file://${process.argv[1]}` ||
+    fileURLToPath(import.meta.url) === process.argv[1]) {
+  execute
+}
