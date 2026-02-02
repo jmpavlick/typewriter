@@ -20,7 +20,6 @@ import Gen.Time
 import Gen.Url
 import Gen.Url.Ext
 import List.Ext
-import Maybe.Extra
 import String.Extra
 
 
@@ -52,6 +51,7 @@ build path ( moduleName, typedef ) =
 
 
 -- TYPE DECLARATIONS
+-- pardon the dust
 
 
 type Fragment

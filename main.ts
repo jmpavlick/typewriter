@@ -43,17 +43,20 @@ const toElmCodegenConfig =
 type ElmCodegenConfig = ReturnType<ReturnType<typeof toElmCodegenConfig>>
 type ElmCodegenParams = Parameters<typeof toElmCodegenConfig>[0]
 
-const toConfig = ({
-  root,
-  relativeInputPath,
-  elmCodegenParams,
-  cleanFirst,
-}: {
-  root: string
-  relativeInputPath: string
-  elmCodegenParams: ElmCodegenParams
-  cleanFirst: boolean
-}) => {
+export const configParamsSchema = z.object({
+  root: z.string(),
+  relativeInputPath: z.string(),
+  elmCodegenParams: z.object({
+    relativeGeneratorModulePath: z.string(),
+    relativeOutdir: z.string(),
+    debug: z.boolean(),
+  }),
+  cleanFirst: z.boolean(),
+})
+
+export type ConfigParams = z.infer<typeof configParamsSchema>
+
+const toConfig = ({ root, relativeInputPath, elmCodegenParams, cleanFirst }: ConfigParams) => {
   const input = toInput(root)(relativeInputPath)
   return {
     workdirPath: toWorkdirPath(root),
