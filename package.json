@@ -1,6 +1,6 @@
 {
   "name": "@jmpavlick/typewriter",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Generate Elm types and decoders from Zod schemas",
   "type": "module",
   "main": "./dist/index.js",
