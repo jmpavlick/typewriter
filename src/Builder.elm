@@ -128,17 +128,18 @@ typeAnnotationAttrs =
                     (Just [])
                 |> Maybe.map Type.record
         )
-    , Ast.onUnion
-        (\_ dictOfMaybeAnnotations ->
-            let
-                flat =
-                    Dict.fromList <|
-                        Maybe.Extra.values <|
-                            List.map (\( k, maybeV ) -> Maybe.map (\v -> ( k, v )) maybeV) <|
-                                Dict.toList dictOfMaybeAnnotations
-            in
-            toCustomTypeAnnotation Nothing flat
-        )
+
+    -- , Ast.onUnion
+    --     (\_ dictOfMaybeAnnotations ->
+    --         let
+    --             flat =
+    --                 Dict.fromList <|
+    --                     Maybe.Extra.values <|
+    --                         List.map (\( k, maybeV ) -> Maybe.map (\v -> ( k, v )) maybeV) <|
+    --                             Dict.toList dictOfMaybeAnnotations
+    --         in
+    --         toCustomTypeVariants Nothing flat
+    --     )
     ]
 
 
@@ -153,8 +154,8 @@ toTypeDecl =
     Result.map (Elm.alias "Value") << toTypeAnnotation
 
 
-toCustomTypeAnnotation : Maybe String -> Dict String Type.Annotation -> Maybe Type.Annotation
-toCustomTypeAnnotation =
+toCustomTypeVariants : Maybe String -> Dict String Type.Annotation -> Maybe Type.Annotation
+toCustomTypeVariants =
     Debug.todo ""
 
 
