@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import "./lib/serializeErrorPrototype.js"
+import z from "zod"
 import zx from "./lib/zod/ext.js"
 import { ConfigParams, configParams, type Config } from "./src/config.js"
 import * as ElmCodegen from "./lib/elmCodegen.js"
@@ -10,6 +11,7 @@ import { md5Async, parseJsonSafe } from "./lib/neverthrow/ext.js"
 import * as fs from "./lib/fs.js"
 import { fromPromise, okAsync, ResultAsync } from "neverthrow"
 import { fileURLToPath } from "url"
+import { init } from "./src/init.js"
 
 const base = {
   ...ouroboros,
@@ -116,21 +118,36 @@ const getUserConfig: ResultAsync<Config, unknown> = fs
   .andThen(zx.parseResultAsync(configParams))
   .map((userConfigParams) => ({ ...base, configParams: userConfigParams }))
 
-const execute = compareBaseConfigHashes
+const generate = compareBaseConfigHashes
   .andThrough(runBaseSetup)
   .andThrough((configStatus) =>
     getUserConfig.map(toRunPropsEntries).andThen(runAllRunPropsEntries(configStatus))
   )
-  .orTee((err) => {
-    console.error(err)
-  })
+
+const command = z.union([z.literal("init"), z.literal("generate")])
+type Command = z.infer<typeof command>
+const toCommand = zx.parseResultAsync(command)
 
 // Only run if this is the main module
 if (
   import.meta.url === `file://${process.argv[1]}` ||
   fileURLToPath(import.meta.url) === process.argv[1]
 ) {
-  execute
+  const commandArg = process.argv[2]
+
+  toCommand(commandArg)
+    .orElse(() => okAsync("generate" as const))
+    .andThen((cmd) => {
+      switch (cmd) {
+        case "init":
+          return init()
+        case "generate":
+          return generate
+      }
+    })
+    .orTee((err) => {
+      console.error(err)
+    })
 }
 
 // Export types for users

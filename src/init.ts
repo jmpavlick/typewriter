@@ -1,9 +1,8 @@
-import { type Config } from "./config.js"
 import * as fs from "../lib/fs.js"
 import path from "path"
 import { ResultAsync } from "neverthrow"
 
-export const init = (config: Config): ResultAsync<void, unknown> => {
+export const init = (): ResultAsync<void, unknown> => {
   const __dirname = fs.toModuleDir(import.meta.url)
   const templatesDir = path.join(__dirname, "..", "templates")
 
