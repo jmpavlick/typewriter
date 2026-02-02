@@ -28,7 +28,8 @@ const toRunPropsEntries = ({
   ]: [string, Config["sections"][number]]) => {
     const elmCodegenConfig: ElmCodegen.Config = {
       ...globalElmCodegenConfig,
-      outdir: path.join(globalElmCodegenConfig.outdir, relativeOutdir),
+      // outdir: path.join(root, relativeOutdir),
+      outdir: relativeOutdir,
       ...(cleanFirst === undefined ? {} : { cleanFirst }),
       ...(debug === undefined ? {} : { debug }),
       ...{ ...elmCodegenOverrides },

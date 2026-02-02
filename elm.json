@@ -1,6 +1,6 @@
 {
   "type": "application",
-  "source-directories": ["codegen", "src", "lib", "generated", "platformWorkerConfig"],
+  "source-directories": ["codegen", "src", "lib", "generated"],
   "elm-version": "0.19.1",
   "dependencies": {
     "direct": {
