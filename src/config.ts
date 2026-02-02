@@ -46,7 +46,7 @@ export const toConfig = ({
   const elmCodegenConfig: ElmCodegen.Config = {
     cleanFirst: false,
     debug: false,
-    cwd: root,
+    cwd: path.join(root, "codegen"),
     generatorModulePath: "GenerateModuleBindings.elm",
     outdir: "generated",
   }

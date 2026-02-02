@@ -9,7 +9,6 @@ import ouroboros from "./src/ouroboros.js"
 import { md5Async, parseJsonSafe } from "./lib/neverthrow/ext.js"
 import * as fs from "./lib/fs.js"
 import { okAsync, ResultAsync } from "neverthrow"
-import stringify from "safe-stable-stringify"
 import { fileURLToPath } from "url"
 
 const base = {
