@@ -4,7 +4,7 @@ import * as ElmCodegen from "./lib/elmCodegen.js"
 import path from "path"
 import { type RunProps } from "./src/main.js"
 
-export const toRunPropsEntries = ({
+const toRunPropsEntries = ({
   root,
   elmCodegenConfig: globalElmCodegenConfig,
   sections,

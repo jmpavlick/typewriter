@@ -17,7 +17,12 @@ export const runProps = z.object({
 })
 export type RunProps = z.infer<typeof runProps>
 
-export const run = ({ label, inputPath, elmCodegenConfig, debugZodAstOutputPath }: RunProps) =>
+export const run = ({
+  label,
+  inputPath,
+  elmCodegenConfig,
+  debugZodAstOutputPath,
+}: RunProps): ResultAsync<void, unknown> =>
   doAsync(() => {
     console.log(`section: ${label}\ninput: ${inputPath}`)
   })
