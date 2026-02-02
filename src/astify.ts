@@ -27,10 +27,5 @@ const toZodSchemas = (module: unknown): ResultAsync<ZodDecls, unknown> => {
   return zx.parseResultAsync(zodDeclsSchema)(module)
 }
 
-export const execute = (
-  root: string,
-  relativeInputPath: string
-): ResultAsync<{ outputModulePath: string[]; decls: ZodDecls }, unknown> =>
-  readModule(path.join(root, relativeInputPath))
-    .andThen(toZodSchemas)
-    .map((decls) => ({ outputModulePath: relativeInputPath.replace(".ts", "").split("/"), decls }))
+export const execute = (inputPath: string): ResultAsync<ZodDecls, unknown> =>
+  readModule(inputPath).andThen(toZodSchemas)

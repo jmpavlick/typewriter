@@ -24,8 +24,15 @@ const toRunPropsEntries = ({
 }: Config): RunProps[] => {
   const fromSection = ([
     label,
-    { relativeInputPaths, relativeOutdir, cleanFirst, debug, elmCodegenOverrides },
-  ]: [string, Config["sections"][number]]) => {
+    {
+      relativeInputPaths,
+      relativeOutdir,
+      cleanFirst,
+      debug,
+      elmCodegenOverrides,
+      outputModuleNamespace,
+    },
+  ]: [string, Config["sections"][number]]): RunProps[] => {
     const elmCodegenConfig: ElmCodegen.Config = {
       ...globalElmCodegenConfig,
       // outdir: path.join(root, relativeOutdir),
@@ -36,14 +43,14 @@ const toRunPropsEntries = ({
     }
 
     return relativeInputPaths.map((rip) => {
-      const relativeInputPath = rip
+      const inputPath = path.join(root, rip)
       const relativeWithoutExt = rip.replace(/\.[^.]+$/, "")
       const debugZodAstOutputPath = path.join(workdirPath, `${relativeWithoutExt}.json`)
 
       return {
-        root,
         label,
-        relativeInputPath,
+        inputPath,
+        outputModuleNamespace: outputModuleNamespace ?? [],
         elmCodegenConfig,
         debugZodAstOutputPath,
       }

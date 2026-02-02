@@ -1,4 +1,4 @@
-module src.config.AaaaaaaaaErrors exposing (..)
+module AaaaaaaaaErrors exposing (..)
 
 
 {-| config:

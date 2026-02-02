@@ -15,7 +15,7 @@ import Maybe.Extra
 
 
 type alias Args =
-    { outputModulePath : List String
+    { outputModuleNamespace : List String
     , decls : List Ast.Decl
     }
 
@@ -23,17 +23,17 @@ type alias Args =
 argsDecoder : D.Decoder Args
 argsDecoder =
     D.map2 Args
-        (D.field "outputModulePath" <| D.list D.string)
+        (D.field "outputModuleNamespace" <| D.list D.string)
         (D.map Dict.toList <| D.field "decls" <| D.dict Ast.decoder)
 
 
 main : Program Json.Encode.Value () ()
 main =
     Generate.fromJson argsDecoder
-        (\{ outputModulePath, decls } ->
+        (\{ outputModuleNamespace, decls } ->
             let
                 outputs =
-                    List.map (Builder.build outputModulePath) decls
+                    List.map (Builder.build outputModuleNamespace) decls
 
                 files =
                     Maybe.Extra.values <|
@@ -68,7 +68,7 @@ main =
                     )
                     <|
                         Elm.file
-                            (outputModulePath ++ [ "AaaaaaaaaErrors" ])
+                            (outputModuleNamespace ++ [ "AaaaaaaaaErrors" ])
                         <|
                             List.map
                                 (\( typeName, messages ) ->

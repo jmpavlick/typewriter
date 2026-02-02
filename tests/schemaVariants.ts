@@ -10,15 +10,15 @@ export const undefined_ = z.undefined()
 export const url_ = z.url()
 
 // core primitives
-export const string_ = z.string()
-export const bool_ = z.boolean()
-export const number_ = z.number()
+export const primitiveString_ = z.string()
+export const primitiveBool_ = z.boolean()
+export const primitiveNumber_ = z.number()
 export const null_ = z.null()
 
 // zod primivites
 export const bigInt_ = z.bigint()
-export const int_ = z.int()
-export const date_ = z.date()
+export const primitiveInt = z.int()
+export const primitiveDate_ = z.date()
 export const datetime_ = z.iso.datetime()
 export const isoDate_ = z.iso.date()
 export const isoTime_ = z.iso.time()
@@ -97,13 +97,13 @@ export const objHeight1 = z.object({
   void_,
   nan_,
   undefined_,
-  string_,
-  bool_,
-  number_,
+  string_: primitiveString_,
+  bool_: primitiveBool_,
+  number_: primitiveNumber_,
   null_,
   bigInt_,
-  int_,
-  date_,
+  int_: primitiveInt,
+  date_: primitiveDate_,
   datetime_,
   isoDate_,
   isoTime_,
@@ -172,15 +172,15 @@ export const arrNan = z.array(nan_)
 export const arrUndefined = z.array(undefined_)
 
 // core array primitives
-export const arrString = z.array(string_)
-export const arrBool = z.array(bool_)
-export const arrNumber = z.array(number_)
+export const arrString = z.array(primitiveString_)
+export const arrBool = z.array(primitiveBool_)
+export const arrNumber = z.array(primitiveNumber_)
 export const arrNull = z.array(null_)
 
 // zod array primitives
 export const arrBigInt = z.array(bigInt_)
-export const arrInt = z.array(int_)
-export const arrDate = z.array(date_)
+export const arrInt = z.array(primitiveInt)
+export const arrDate = z.array(primitiveDate_)
 export const arrDatetime = z.array(datetime_)
 export const arrIsoDate = z.array(isoDate_)
 export const arrIsoTime = z.array(isoTime_)
@@ -196,15 +196,15 @@ export const optArrNan = z.array(nan_).optional()
 export const optArrUndefined = z.array(undefined_).optional()
 
 // core optional array primitives
-export const optArrString = z.array(string_).optional()
-export const optArrBool = z.array(bool_).optional()
-export const optArrNumber = z.array(number_).optional()
+export const optArrString = z.array(primitiveString_).optional()
+export const optArrBool = z.array(primitiveBool_).optional()
+export const optArrNumber = z.array(primitiveNumber_).optional()
 export const optArrNull = z.array(null_).optional()
 
 // zod optional array primitives
 export const optArrBigInt = z.array(bigInt_).optional()
-export const optArrInt = z.array(int_).optional()
-export const optArrDate = z.array(date_).optional()
+export const optArrInt = z.array(primitiveInt).optional()
+export const optArrDate = z.array(primitiveDate_).optional()
 export const optArrDatetime = z.array(datetime_).optional()
 export const optArrIsoDate = z.array(isoDate_).optional()
 export const optArrIsoTime = z.array(isoTime_).optional()
@@ -216,14 +216,14 @@ export const optArrUrl = z.array(url_).optional()
 export const nullableArrUnknown = z.array(unknown_).nullable()
 
 // core nullable array primitives
-export const nullableArrString = z.array(string_).nullable()
-export const nullableArrBool = z.array(bool_).nullable()
-export const nullableArrNumber = z.array(number_).nullable()
+export const nullableArrString = z.array(primitiveString_).nullable()
+export const nullableArrBool = z.array(primitiveBool_).nullable()
+export const nullableArrNumber = z.array(primitiveNumber_).nullable()
 
 // zod nullable array primitives
 export const nullableArrBigInt = z.array(bigInt_).nullable()
-export const nullableArrInt = z.array(int_).nullable()
-export const nullableArrDate = z.array(date_).nullable()
+export const nullableArrInt = z.array(primitiveInt).nullable()
+export const nullableArrDate = z.array(primitiveDate_).nullable()
 export const nullableArrDatetime = z.array(datetime_).nullable()
 export const nullableArrIsoDate = z.array(isoDate_).nullable()
 export const nullableArrIsoTime = z.array(isoTime_).nullable()
@@ -235,14 +235,14 @@ export const nullableArrUrl = z.array(url_).nullable()
 export const nullishArrUnknown = z.array(unknown_).nullish()
 
 // core nullish array primitives
-export const nullishArrString = z.array(string_).nullish()
-export const nullishArrBool = z.array(bool_).nullish()
-export const nullishArrNumber = z.array(number_).nullish()
+export const nullishArrString = z.array(primitiveString_).nullish()
+export const nullishArrBool = z.array(primitiveBool_).nullish()
+export const nullishArrNumber = z.array(primitiveNumber_).nullish()
 
 // zod nullish array primitives
 export const nullishArrBigInt = z.array(bigInt_).nullish()
-export const nullishArrInt = z.array(int_).nullish()
-export const nullishArrDate = z.array(date_).nullish()
+export const nullishArrInt = z.array(primitiveInt).nullish()
+export const nullishArrDate = z.array(primitiveDate_).nullish()
 export const nullishArrDatetime = z.array(datetime_).nullish()
 export const nullishArrIsoDate = z.array(isoDate_).nullish()
 export const nullishArrIsoTime = z.array(isoTime_).nullish()

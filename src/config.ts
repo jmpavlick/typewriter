@@ -7,6 +7,7 @@ import * as ElmCodegen from "../lib/elmCodegen.js"
 const configParamsSection = z.object({
   relativeInputPaths: z.array(z.string()),
   relativeOutdir: z.string(),
+  outputModuleNamespace: z.array(z.string()).optional(),
   relativePrepareScriptPath: z.string().optional(),
   ...ElmCodegen.config
     .pick({

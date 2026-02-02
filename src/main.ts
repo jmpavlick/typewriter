@@ -11,24 +11,24 @@ import * as fs from "../lib/fs.js"
  */
 export const runProps = z.object({
   label: z.string(),
-  root: z.string(),
-  relativeInputPath: z.string(),
+  inputPath: z.string(),
+  outputModuleNamespace: z.array(z.string()),
   elmCodegenConfig: ElmCodegen.config,
   debugZodAstOutputPath: z.string(),
 })
 export type RunProps = z.infer<typeof runProps>
 
 export const run = ({
-  root,
   label,
-  relativeInputPath: inputPath,
+  inputPath: inputPath,
   elmCodegenConfig,
   debugZodAstOutputPath,
+  outputModuleNamespace,
 }: RunProps): ResultAsync<void, unknown> =>
   doAsync(() => {
     console.log(`section: ${label}\ninput: ${inputPath}`)
   })
-    .andThen(() => Astify.execute(root, inputPath))
+    .andThen(() => Astify.execute(inputPath))
     .andThrough((zodDecls) =>
       elmCodegenConfig.debug
         ? fs.writeFileUtf8(debugZodAstOutputPath, JSON.stringify(zodDecls, null, 2), {
@@ -37,4 +37,5 @@ export const run = ({
           })
         : okAsync(undefined)
     )
+    .map((decls) => ({ outputModuleNamespace, decls }))
     .andThen(ElmCodegen.execute(elmCodegenConfig))

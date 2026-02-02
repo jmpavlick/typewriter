@@ -1,4 +1,4 @@
-module Src.Config.ConfigParams exposing (..)
+module ConfigParams exposing (..)
 
 import Json.Decode
 import Json.Decode.Ext
@@ -11,6 +11,7 @@ type alias Value =
         List { cleanFirst : Maybe Bool
         , debug : Maybe Bool
         , elmCodegenOverrides : Maybe { generatorModulePath : Maybe String }
+        , outputModuleNamespace : Maybe (List String)
         , relativeInputPaths : List String
         , relativeOutdir : String
         , relativePrepareScriptPath : Maybe String
@@ -49,13 +50,15 @@ decoder =
                                                         "sections"
                                                         (Json.Decode.list
                                                                  (Json.Decode.succeed
-                                                                          (\cleanFirst debug elmCodegenOverrides relativeInputPaths relativeOutdir relativePrepareScriptPath ->
+                                                                          (\cleanFirst debug elmCodegenOverrides outputModuleNamespace relativeInputPaths relativeOutdir relativePrepareScriptPath ->
                                                                                    { cleanFirst =
                                                                                        cleanFirst
                                                                                    , debug =
                                                                                        debug
                                                                                    , elmCodegenOverrides =
                                                                                        elmCodegenOverrides
+                                                                                   , outputModuleNamespace =
+                                                                                       outputModuleNamespace
                                                                                    , relativeInputPaths =
                                                                                        relativeInputPaths
                                                                                    , relativeOutdir =
@@ -127,25 +130,39 @@ decoder =
                                                                                                                                           )
                                                                                                                              ) |> Json.Decode.Ext.andMap
                                                                                                                                               (Json.Decode.field
-                                                                                                                                                           "relativeInputPaths"
-                                                                                                                                                           (Json.Decode.list
-                                                                                                                                                                        Json.Decode.string
+                                                                                                                                                           "outputModuleNamespace"
+                                                                                                                                                           (Json.Decode.oneOf
+                                                                                                                                                                        [ Json.Decode.maybe
+                                                                                                                                                                            (Json.Decode.list
+                                                                                                                                                                               Json.Decode.string
+                                                                                                                                                                            )
+                                                                                                                                                                        , Json.Decode.nullable
+                                                                                                                                                                            (Json.Decode.list
+                                                                                                                                                                               Json.Decode.string
+                                                                                                                                                                            )
+                                                                                                                                                                        ]
                                                                                                                                                            )
                                                                                                                                               ) |> Json.Decode.Ext.andMap
                                                                                                                                                                (Json.Decode.field
-                                                                                                                                                                            "relativeOutdir"
-                                                                                                                                                                            Json.Decode.string
+                                                                                                                                                                            "relativeInputPaths"
+                                                                                                                                                                            (Json.Decode.list
+                                                                                                                                                                                         Json.Decode.string
+                                                                                                                                                                            )
                                                                                                                                                                ) |> Json.Decode.Ext.andMap
                                                                                                                                                                                 (Json.Decode.field
-                                                                                                                                                                                             "relativePrepareScriptPath"
-                                                                                                                                                                                             (Json.Decode.oneOf
-                                                                                                                                                                                                          [ Json.Decode.maybe
-                                                                                                                                                                                                              Json.Decode.string
-                                                                                                                                                                                                          , Json.Decode.nullable
-                                                                                                                                                                                                              Json.Decode.string
-                                                                                                                                                                                                          ]
-                                                                                                                                                                                             )
-                                                                                                                                                                                )
+                                                                                                                                                                                             "relativeOutdir"
+                                                                                                                                                                                             Json.Decode.string
+                                                                                                                                                                                ) |> Json.Decode.Ext.andMap
+                                                                                                                                                                                                 (Json.Decode.field
+                                                                                                                                                                                                              "relativePrepareScriptPath"
+                                                                                                                                                                                                              (Json.Decode.oneOf
+                                                                                                                                                                                                                           [ Json.Decode.maybe
+                                                                                                                                                                                                                               Json.Decode.string
+                                                                                                                                                                                                                           , Json.Decode.nullable
+                                                                                                                                                                                                                               Json.Decode.string
+                                                                                                                                                                                                                           ]
+                                                                                                                                                                                                              )
+                                                                                                                                                                                                 )
                                                                  )
                                                         )
                                                )

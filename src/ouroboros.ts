@@ -8,12 +8,14 @@ const configParams: ConfigParams = {
       relativeOutdir: "generated",
       cleanFirst: true,
       debug: true,
+      outputModuleNamespace: ["IntegrationTests"],
     },
     main: {
       relativeInputPaths: ["src/config.ts"],
       relativeOutdir: "platformWorkerConfig",
       cleanFirst: true,
       debug: true,
+      outputModuleNamespace: [],
     },
   },
 }
