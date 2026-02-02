@@ -7,56 +7,74 @@ import z from "zod"
 import zx from "./lib/zod/ext.js"
 import { ternary } from "./lib/neverthrow/ext.js"
 import * as fs from "fs"
-import { dirname } from "path"
+import * as path from "path"
 import * as ElmCodegen from "elm-codegen"
-import { relative } from "path/win32"
 
-// eventually, make this stuff configurable
-const ROOT = `.`
-const WORKDIR = `${ROOT}/.typewriter`
-const INPUT = `${ROOT}/tests/schemaVariants.ts`
-const OUTFILE_CODEGEN_INPUT = `${WORKDIR}/${INPUT.replace(WORKDIR, "")}.json`
-
-const toWorkdirPath = (root: string) => `${ROOT}/.typewriter`
-const toInput = (root: string) => (relInputPath: string) => ({
-  path: `${root}/${relInputPath}`,
-  rel: relInputPath,
+// Schemas
+const inputSchema = z.object({
+  path: z.string(),
+  rel: z.string(),
 })
 
+const elmCodegenConfigSchema = z.object({
+  cwd: z.string(),
+  generatorModulePath: z.string(),
+  outdir: z.string(),
+  debug: z.boolean(),
+})
+
+const elmCodegenParamsSchema = z.object({
+  relativeGeneratorModulePath: z.string(),
+  relativeOutdir: z.string(),
+  debug: z.boolean(),
+})
+
+export const configParamsSchema = z.object({
+  root: z.string(),
+  relativeInputPath: z.string(),
+  elmCodegenParams: elmCodegenParamsSchema,
+  cleanFirst: z.boolean(),
+})
+
+const configSchema = z.object({
+  workdirPath: z.string(),
+  input: inputSchema,
+  elmCodegenConfig: elmCodegenConfigSchema,
+  cleanFirst: z.boolean(),
+})
+
+// Types
+type Input = z.infer<typeof inputSchema>
+type ElmCodegenConfig = z.infer<typeof elmCodegenConfigSchema>
+type ElmCodegenParams = z.infer<typeof elmCodegenParamsSchema>
+export type ConfigParams = z.infer<typeof configParamsSchema>
+export type Config = z.infer<typeof configSchema>
+
+// Constructors
+const toWorkdirPath = (root: string): string => path.join(root, ".typewriter")
+
+const toInput =
+  (root: string) =>
+  (relInputPath: string): Input => ({
+    path: path.resolve(root, relInputPath),
+    rel: relInputPath,
+  })
+
 const toElmCodegenConfig =
-  ({
-    relativeGeneratorModulePath,
-    relativeOutdir,
-    debug,
-  }: {
-    relativeGeneratorModulePath: string
-    relativeOutdir: string
-    debug: boolean
-  }) =>
-  (root: string) => ({
+  ({ relativeGeneratorModulePath, relativeOutdir, debug }: ElmCodegenParams) =>
+  (root: string): ElmCodegenConfig => ({
     cwd: root,
     generatorModulePath: relativeGeneratorModulePath,
     outdir: relativeOutdir,
     debug,
   })
 
-type ElmCodegenConfig = ReturnType<ReturnType<typeof toElmCodegenConfig>>
-type ElmCodegenParams = Parameters<typeof toElmCodegenConfig>[0]
-
-export const configParamsSchema = z.object({
-  root: z.string(),
-  relativeInputPath: z.string(),
-  elmCodegenParams: z.object({
-    relativeGeneratorModulePath: z.string(),
-    relativeOutdir: z.string(),
-    debug: z.boolean(),
-  }),
-  cleanFirst: z.boolean(),
-})
-
-export type ConfigParams = z.infer<typeof configParamsSchema>
-
-const toConfig = ({ root, relativeInputPath, elmCodegenParams, cleanFirst }: ConfigParams) => {
+const toConfig = ({
+  root,
+  relativeInputPath,
+  elmCodegenParams,
+  cleanFirst,
+}: ConfigParams): Config => {
   const input = toInput(root)(relativeInputPath)
   return {
     workdirPath: toWorkdirPath(root),
@@ -76,8 +94,6 @@ const config = toConfig({
   },
   cleanFirst: true,
 })
-
-export type Config = ReturnType<typeof toConfig>
 
 // read the input file as a module and do cursed shit to make it more objectionable
 // (pun intended)
@@ -122,7 +138,7 @@ const debugWriteElmCodegenInput =
       .andThen(
         Result.fromThrowable(() =>
           fs.writeFileSync(
-            `${config.workdirPath}/${config.input.rel}.json`,
+            path.join(config.workdirPath, `${config.input.rel}.json`),
             JSON.stringify(decls, null, 2)
           )
         )
@@ -138,7 +154,7 @@ const toElmCodegenExec =
         if (cleanFirst) {
           return okAsync().andThen(
             Result.fromThrowable(() =>
-              fs.rmSync(`${outdir}/*.elm`, { recursive: true, force: true })
+              fs.rmSync(path.join(outdir, "*.elm"), { recursive: true, force: true })
             )
           )
         }
