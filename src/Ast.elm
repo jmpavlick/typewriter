@@ -476,6 +476,17 @@ decodeHelp =
                         "bigint" ->
                             D.succeed SBigInt
 
+                        "nonoptional" ->
+                            D.at [ "def", "innerType", "type" ] D.string
+                                |> D.andThen
+                                    (\str ->
+                                        if str == "optional" then
+                                            D.at [ "def", "innerType", "def", "innerType" ] decoder
+
+                                        else
+                                            D.fail "Did not expect a `nonoptional` without an `optional` immediately inside"
+                                    )
+
                         "optional" ->
                             D.map SOptional <|
                                 D.at [ "def", "innerType" ] decoder
