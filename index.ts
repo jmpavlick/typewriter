@@ -8,7 +8,7 @@ import { type RunProps, run } from "./src/main.js"
 import ouroboros from "./src/ouroboros.js"
 import { md5Async, parseJsonSafe } from "./lib/neverthrow/ext.js"
 import * as fs from "./lib/fs.js"
-import { okAsync, ResultAsync } from "neverthrow"
+import { fromPromise, okAsync, ResultAsync } from "neverthrow"
 import { fileURLToPath } from "url"
 
 const base = {
@@ -109,6 +109,9 @@ const runBaseSetup = ({
 
 const getUserConfig: ResultAsync<Config, unknown> = fs
   .readFile(base.userConfigParamsPath)
+  .orElse(() =>
+    fs.cwd().andThen((cwd) => fromPromise(import(path.join(cwd, "typewriter.config.ts")), (e) => e))
+  )
   .orElse(() => okAsync({ root: base.root, sections: {} }))
   .andThen(zx.parseResultAsync(configParams))
   .map((userConfigParams) => ({ ...base, configParams: userConfigParams }))

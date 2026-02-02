@@ -1,6 +1,7 @@
 import { okAsync, ResultAsync } from "neverthrow"
 import * as fs from "fs"
 import path from "path"
+import { fileURLToPath } from "url"
 
 export const readFile = (
   path: string,
@@ -43,3 +44,28 @@ export const writeFileUtf8 = (
       (e) => `Failed to write file at ${outputPath}: ${e}`
     )
   )
+
+export const cwd = (): ResultAsync<string, unknown> =>
+  ResultAsync.fromSafePromise(Promise.resolve(process.cwd()))
+
+export const copyFile = (
+  src: string,
+  dest: string,
+  options?: {
+    overwrite?: boolean
+  }
+): ResultAsync<void, unknown> => {
+  const mode = options?.overwrite ? 0 : fs.constants.COPYFILE_EXCL
+
+  return ResultAsync.fromPromise(
+    fs.promises.copyFile(src, dest, mode),
+    (e) => `Failed to copy file from ${src} to ${dest}: ${e}`
+  )
+}
+
+/**
+ * Converts import.meta.url to the module's directory path.
+ * Usage: `const __dirname = toModuleDir(import.meta.url)`
+ */
+export const toModuleDir = (importMetaUrl: string): string =>
+  path.dirname(fileURLToPath(importMetaUrl))
