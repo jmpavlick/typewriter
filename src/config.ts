@@ -1,4 +1,5 @@
 import z from "zod"
+import * as path from "path"
 import * as ElmCodegen from "../lib/elmCodegen.js"
 
 /** this defines a single configuration section; at least one is required for the program to do anything meaningful
@@ -26,14 +27,26 @@ export const configParams = z.object({
 export type ConfigParams = z.infer<typeof configParams>
 
 export const config = z.object({
-  root: z.string(),
   workdirPath: z.string(),
-  ...configParams,
+  ...configParams.shape,
+  root: z.string(),
 })
 export type Config = z.infer<typeof config>
 
-export const toConfig = ({}: ConfigParams): Config => {
-  throw new Error("todo lol")
+export const toConfig = ({
+  root: maybeRoot,
+  relativeGlobalPrepareScriptPath,
+  sections,
+}: ConfigParams): Config => {
+  const root = maybeRoot ?? "."
+  const workdirPath = path.join(root, ".typewriter")
+
+  return {
+    root,
+    workdirPath,
+    relativeGlobalPrepareScriptPath,
+    sections,
+  }
 }
 
 export const zodDecls = z.record(

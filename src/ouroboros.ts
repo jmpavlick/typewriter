@@ -1,11 +1,7 @@
-import type { ConfigParams } from "./schema.js"
+import { type ConfigParams, toConfig } from "./config.js"
 
 const configParams: ConfigParams = {
   root: ".",
-  defaultElmCodegenParams: {
-    relativeGeneratorModulePath: "codegen/GenerateZodBindings.elm",
-    debug: true,
-  },
   sections: {
     main: {
       relativeInputPaths: ["tests/schemaVariants.ts"],
@@ -15,4 +11,4 @@ const configParams: ConfigParams = {
   },
 }
 
-export default configParams
+export default toConfig(configParams)
