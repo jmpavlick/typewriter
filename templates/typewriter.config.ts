@@ -1,4 +1,4 @@
-import { type ConfigParams } from "../src/config.js"
+import { type ConfigParams } from "@jmpavlick/typewriter"
 
 const config: ConfigParams = {
   sections: {

@@ -1,5 +1,5 @@
 {
-  "name": "typewriter",
+  "name": "@jmpavlick/typewriter",
   "version": "1.0.0",
   "description": "",
   "type": "module",
@@ -12,6 +12,9 @@
     "dist",
     "templates"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "build": "tsc",
     "dev": "pnpm typecheck; pnpm test:watch",
