@@ -1,31 +1,47 @@
 import z from "zod"
 
-const inputConfigSchema = z.object({})
+// Schemas
+export const inputSchema = z.object({
+  path: z.string(),
+  rel: z.string(),
+})
 
-const outputConfigSchema = z.object({
-  dir: z.string().describe("file path for output, relative to the `workingDir` option"),
-  mkdirP: z.boolean().describe("create the directory path for `outputDir` if it does not exist"),
-  cleanOnGenerate: z
-    .boolean()
-    .describe("clean the output directory before `typewriter` generates output"),
+export const elmCodegenConfigSchema = z.object({
+  cwd: z.string(),
+  generatorModulePath: z.string(),
+  outdir: z.string(),
+  debug: z.boolean(),
+})
+
+export const elmCodegenParamsSchema = z.object({
+  relativeGeneratorModulePath: z.string(),
+  relativeOutdir: z.string(),
+  debug: z.boolean(),
+})
+
+export const configParamsSchema = z.object({
+  root: z.string(),
+  relativeInputPath: z.string(),
+  elmCodegenParams: elmCodegenParamsSchema,
+  cleanFirst: z.boolean(),
 })
 
 export const configSchema = z.object({
-  workingDir: z
-    .union([
-      z.literal("here"),
-      z.literal("root"),
-      z.string().describe("file path relative to the configuration file"),
-    ])
-    .describe("working directory for `typewriter` execution"),
-  input: inputConfigSchema,
-  output: outputConfigSchema,
+  workdirPath: z.string(),
+  input: inputSchema,
+  elmCodegenConfig: elmCodegenConfigSchema,
+  cleanFirst: z.boolean(),
 })
 
-const nx = (b: boolean) => configSchema.omit({ workingDir: b ? true : undefined }) //.omit({ workingDir: true })
+export const zodDeclsSchema = z.record(
+  z.string(),
+  z.custom<z.ZodType>((v) => v instanceof z.ZodType, { error: "Value must be a Zod schema" })
+)
 
-const nxx = nx(true)
-
-type A = z.infer<typeof nxx>
-
-type Config = z.infer<typeof configSchema>
+// Types
+export type Input = z.infer<typeof inputSchema>
+export type ElmCodegenConfig = z.infer<typeof elmCodegenConfigSchema>
+export type ElmCodegenParams = z.infer<typeof elmCodegenParamsSchema>
+export type ConfigParams = z.infer<typeof configParamsSchema>
+export type Config = z.infer<typeof configSchema>
+export type ZodDecls = z.infer<typeof zodDeclsSchema>

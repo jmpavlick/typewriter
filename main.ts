@@ -1,52 +1,23 @@
 import "./lib/serializeErrorPrototype.js"
 import stringify from "safe-stable-stringify"
 import { type ResultAsync, okAsync, errAsync, fromPromise, Result, ok } from "neverthrow"
-import z from "zod"
 import zx from "./lib/zod/ext.js"
 import { ternary } from "./lib/neverthrow/ext.js"
 import * as fs from "fs"
 import * as path from "path"
 import * as ElmCodegen from "elm-codegen"
+import {
+  type Input,
+  type ElmCodegenConfig,
+  type ElmCodegenParams,
+  type ConfigParams,
+  type Config,
+  type ZodDecls,
+  configParamsSchema,
+  zodDeclsSchema,
+} from "./src/schema.js"
 
-// Schemas
-const inputSchema = z.object({
-  path: z.string(),
-  rel: z.string(),
-})
-
-const elmCodegenConfigSchema = z.object({
-  cwd: z.string(),
-  generatorModulePath: z.string(),
-  outdir: z.string(),
-  debug: z.boolean(),
-})
-
-const elmCodegenParamsSchema = z.object({
-  relativeGeneratorModulePath: z.string(),
-  relativeOutdir: z.string(),
-  debug: z.boolean(),
-})
-
-export const configParamsSchema = z.object({
-  root: z.string(),
-  relativeInputPath: z.string(),
-  elmCodegenParams: elmCodegenParamsSchema,
-  cleanFirst: z.boolean(),
-})
-
-const configSchema = z.object({
-  workdirPath: z.string(),
-  input: inputSchema,
-  elmCodegenConfig: elmCodegenConfigSchema,
-  cleanFirst: z.boolean(),
-})
-
-// Types
-type Input = z.infer<typeof inputSchema>
-type ElmCodegenConfig = z.infer<typeof elmCodegenConfigSchema>
-type ElmCodegenParams = z.infer<typeof elmCodegenParamsSchema>
-export type ConfigParams = z.infer<typeof configParamsSchema>
-export type Config = z.infer<typeof configSchema>
+export { configParamsSchema, type ConfigParams, type Config } from "./src/schema.js"
 
 // Constructors
 const toWorkdirPath = (root: string): string => path.join(root, ".typewriter")
@@ -101,13 +72,6 @@ const read = (filepath: string): ResultAsync<Record<string, unknown>, unknown> =
   )
 
 // transform the module-object to zod schemas
-const zodDeclsSchema = z.record(
-  z.string(),
-  z.custom<z.ZodType>((v) => v instanceof z.ZodType, { error: "Value must be a Zod schema" })
-)
-
-type ZodDecls = z.infer<typeof zodDeclsSchema>
-
 const toZodSchemas = (module: unknown): ResultAsync<ZodDecls, unknown> =>
   ternary((m) => typeof m === "object" && m !== null)
     .whenFalse(errAsync(`Dynamic import failed; module contains no exports`))(module)
