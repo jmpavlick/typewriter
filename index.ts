@@ -8,6 +8,7 @@ import base from "./src/ouroboros.js"
 import { md5Async, parseJsonSafe } from "./lib/neverthrow/ext.js"
 import * as fs from "./lib/fs.js"
 import { okAsync, ResultAsync } from "neverthrow"
+import stringify from "safe-stable-stringify"
 
 const toRunPropsEntries = ({
   root,
@@ -93,7 +94,7 @@ const runBaseSetup = ({
 
 const getUserConfig: ResultAsync<Config, unknown> = fs
   .readFile(base.userConfigParamsPath)
-  .orElse(() => okAsync({ root: base.root, sections: [] }))
+  .orElse(() => okAsync({ root: base.root, sections: {} }))
   .andThen(zx.parseResultAsync(configParams))
   .map((userConfigParams) => ({ ...base, configParams: userConfigParams }))
 
@@ -102,5 +103,8 @@ const execute = compareBaseConfigHashes
   .andThrough((configStatus) =>
     getUserConfig.map(toRunPropsEntries).andThen(runAllRunPropsEntries(configStatus))
   )
+  .orTee((err) => {
+    console.error(err)
+  })
 
 execute
