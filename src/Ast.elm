@@ -1,15 +1,15 @@
 module Ast exposing
     ( Decl, Value(..)
     , decoder
+    , para, optPara
     , Props, Attr
     , onString, onInt, onFloat, onBool
     , onAny, onUnknown, onVoid, onUndefined, onNull, onNaN
     , onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime
     , onUnimplemented
-    , onOptional, onNullable
+    , onOptional, onNullable, onNullableOrOptionalFlat
     , onArray, onRecord, onObject
     , onUnion
-    , onNullableOrOptionalFlat, optPara, para
     )
 
 {-|
@@ -27,7 +27,7 @@ module Ast exposing
 
 # The Blessed Paramorphism (calm down it's just a fancy `fold`)
 
-@docs para optPara
+@docs para, optPara
 
 
 # The Glorious F-Algebra (And Its Attribute Band)
@@ -48,7 +48,7 @@ module Ast exposing
 
 ### Node Attributes
 
-@docs onOptional, onNullable, onOptionalOrNullableFlat
+@docs onOptional, onNullable, onNullableOrOptionalFlat
 @docs onArray, onRecord, onObject
 @docs onUnion
 
