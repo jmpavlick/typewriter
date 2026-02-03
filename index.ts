@@ -103,7 +103,15 @@ const command = z.union([z.literal("init"), z.literal("generate")])
 type Command = z.infer<typeof command>
 const toCommand = zx.parseResultAsync(command)
 
-const generateFlags = z.union([z.undefined(), z.tuple([z.literal("--config"), z.string()])])
+const generateFlags = z.union([
+  z
+    .array(z.any())
+    .refine((arr) => arr.length === 0, {
+      message: "invalid value; expected either a flag and value, or an empty array",
+    })
+    .refine(() => "default" as const),
+  z.tuple([z.literal("--config"), z.string()]),
+])
 
 // Only run if this is the main module
 if (
@@ -111,6 +119,8 @@ if (
   fileURLToPath(import.meta.url) === process.argv[1]
 ) {
   const commandArg = debugLog("process.argv[2]", process.argv[2])
+
+  debugLog("the whole argv", process.argv)
 
   await toCommand(commandArg)
     .orElse(() => okAsync("generate" as const))
@@ -124,14 +134,15 @@ if (
               debugLog("process.argv.slice(2, 2)", process.argv.slice(2, 2))
             )
             .andThen((maybeArg) => {
-              if (maybeArg === undefined) return generate()
+              if (maybeArg.length === 0) return generate()
               const tag = maybeArg[0]
               switch (tag) {
                 case "--config":
                   return generate(maybeArg[1])
+                case "--default":
+                  return generate()
                 default:
-                  const _: never = tag
-                  return errAsync("typescript moment")
+                  return errAsync(`unhandled tag: ${tag}`)
               }
             })
         default:
