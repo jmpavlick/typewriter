@@ -6,7 +6,7 @@ import { ConfigParams, configParams, type Config } from "./src/config.js"
 import * as ElmCodegen from "./lib/elmCodegen.js"
 import path from "path"
 import { type RunProps, run } from "./src/main.js"
-import { debugLog, importAsync, md5Async, parseJsonSafe } from "./lib/neverthrow/ext.js"
+import { importAsync, md5Async, parseJsonSafe } from "./lib/neverthrow/ext.js"
 import * as fs from "./lib/fs.js"
 import { errAsync, fromPromise, okAsync, ResultAsync } from "neverthrow"
 import { fileURLToPath } from "url"
@@ -41,7 +41,7 @@ const toRunPropsEntries = ({
     }
 
     return relativeInputPaths.map((rip) => {
-      const inputPath = debugLog("inputPath", path.join(debugLog("root", root), rip))
+      const inputPath = path.join(root, rip)
       const relativeWithoutExt = rip.replace(/\.[^.]+$/, "")
       const debugZodAstOutputPath = path.join(workdirPath, `${relativeWithoutExt}.json`)
 
