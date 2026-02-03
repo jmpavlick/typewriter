@@ -9,7 +9,7 @@ export const init = (): ResultAsync<void, unknown> => {
 
   return fs
     .cwd()
-    .andThen((targetDir) =>
+    .value.andThen((targetDir) =>
       ResultAsync.combineWithAllErrors([
         fs.mkdir("./.typewriter", { recursive: true }),
         fs.copyFile(

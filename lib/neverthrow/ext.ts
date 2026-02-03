@@ -39,8 +39,10 @@ export const doAsync = <T>(syncExec: () => T): ResultAsync<T, unknown> =>
 export const md5Async = (obj: unknown): ResultAsync<string, unknown> =>
   doAsync(() => crypto.createHash("md5").update(stringify(obj!)).digest("hex"))
 
-export const importAsync = (from: string, schema: z.ZodType) =>
-  ResultAsync.fromPromise(import(from), (e) => e).andThen(zx.parseResultAsync(schema))
+export const importAsync =
+  (schema: z.ZodType) =>
+  (from: string): ResultAsync<z.infer<typeof schema>, unknown> =>
+    ResultAsync.fromPromise(import(from), (e) => e).andThen(zx.parseResultAsync(schema))
 
 export const debugLog = (label: string, whatever: any): any => {
   const str = whatever === undefined ? "input is undefined" : stringify(whatever)

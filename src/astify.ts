@@ -9,7 +9,10 @@ export type ZodDecls = z.infer<typeof zodDecls>
 
 // Read a module and extract its exports as a plain object
 const readModule = (filepath: string): ResultAsync<Record<string, unknown>, unknown> =>
-  ResultAsync.fromPromise(import(filepath), (e) => `Failed to import from filepath: ${e}`).andThen(
+  ResultAsync.fromPromise(
+    import(filepath),
+    (e) => `Failed to import from filepath ${filepath}: ${e}`
+  ).andThen(
     Result.fromThrowable((m) =>
       Object.fromEntries(
         Object.entries(m).filter(([, obj]) => {

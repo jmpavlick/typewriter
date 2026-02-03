@@ -45,8 +45,15 @@ export const writeFileUtf8 = (
     )
   )
 
-export const cwd = (): ResultAsync<string, unknown> =>
-  ResultAsync.fromSafePromise(Promise.resolve(process.cwd()))
+export const cwd = (): {
+  value: ResultAsync<string, unknown>
+  join: (...paths: string[]) => ResultAsync<string, unknown>
+} => {
+  const join = (...paths: string[]) =>
+    ResultAsync.fromSafePromise(Promise.resolve(process.cwd())).map((v) => path.join(v, ...paths))
+
+  return { value: join(...[]), join }
+}
 
 export const copyFile = (
   src: string,

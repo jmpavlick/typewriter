@@ -14,11 +14,13 @@ import { init } from "./src/init.js"
 import { toConfig } from "./src/config.js"
 
 const toRunPropsEntries = ({
-  root,
+  root: relativeRoot,
   elmCodegenConfig: globalElmCodegenConfig,
   sections,
   workdirPath,
 }: Config): RunProps[] => {
+  // hack
+  const root = path.join(process.cwd(), relativeRoot)
   const fromSection = ([
     label,
     {
@@ -32,7 +34,6 @@ const toRunPropsEntries = ({
   ]: [string, Config["sections"][number]]): RunProps[] => {
     const elmCodegenConfig: ElmCodegen.Config = {
       ...globalElmCodegenConfig,
-      // outdir: path.join(root, relativeOutdir),
       outdir: relativeOutdir,
       ...(cleanFirst === undefined ? {} : { cleanFirst }),
       ...(debug === undefined ? {} : { debug }),
@@ -40,7 +41,7 @@ const toRunPropsEntries = ({
     }
 
     return relativeInputPaths.map((rip) => {
-      const inputPath = path.join(root, rip)
+      const inputPath = debugLog("inputPath", path.join(debugLog("root", root), rip))
       const relativeWithoutExt = rip.replace(/\.[^.]+$/, "")
       const debugZodAstOutputPath = path.join(workdirPath, `${relativeWithoutExt}.json`)
 
@@ -70,7 +71,7 @@ const getUserConfig = (configFilePath?: string): ResultAsync<Config, unknown> =>
           .map((module: any) => module.default)
           .map((userConfigParams) => ({ cwd, userConfigParams }))
       )
-      .orElse((err) => fs.cwd().map((cwd) => ({ cwd, userConfigParams: { sections: {} } })))
+      .orElse((err) => fs.cwd().value.map((cwd) => ({ cwd, userConfigParams: { sections: {} } })))
       .andThen(({ cwd, userConfigParams }) =>
         zx
           .parseResultAsync(configParams)(userConfigParams)
@@ -81,10 +82,17 @@ const getUserConfig = (configFilePath?: string): ResultAsync<Config, unknown> =>
       )
 
   const argsConfigIO = (path: string) =>
-    importAsync(path, z.object({ default: configParams })).map(toConfig)
+    fs
+      .cwd()
+      .join(path)
+      .andThen((fullPath) =>
+        importAsync(z.object({ default: configParams }))(fullPath).map((v) =>
+          toConfig((v as any).default)
+        )
+      )
 
   return configFilePath === undefined
-    ? fs.cwd().andThen(defaultConfigIO)
+    ? fs.cwd().value.andThen(defaultConfigIO)
     : argsConfigIO(configFilePath)
 }
 
@@ -118,9 +126,7 @@ if (
   import.meta.url === `file://${process.argv[1]}` ||
   fileURLToPath(import.meta.url) === process.argv[1]
 ) {
-  const commandArg = debugLog("process.argv[2]", process.argv[2])
-
-  debugLog("the whole argv", process.argv)
+  const commandArg = process.argv[2]
 
   await toCommand(commandArg)
     .orElse(() => okAsync("generate" as const))
@@ -130,9 +136,7 @@ if (
           return init()
         case "generate":
           return zx
-            .parseResultAsync(generateFlags)(
-              debugLog("process.argv.slice(2, 2)", process.argv.slice(2, 2))
-            )
+            .parseResultAsync(generateFlags)(process.argv.slice(3))
             .andThen((maybeArg) => {
               if (maybeArg.length === 0) return generate()
               const tag = maybeArg[0]
