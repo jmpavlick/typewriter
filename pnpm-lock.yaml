@@ -11,15 +11,21 @@ importers:
       dedent:
         specifier: ^1.7.1
         version: 1.7.1
+      elm:
+        specifier: 0.19.1-6
+        version: 0.19.1-6
+      elm-codegen:
+        specifier: ^0.6.3
+        version: 0.6.3
       neverthrow:
         specifier: ^8.2.0
         version: 8.2.0
       safe-stable-stringify:
         specifier: ^2.5.0
         version: 2.5.0
-      zod:
-        specifier: ^4.3.6
-        version: 4.3.6
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
     devDependencies:
       '@types/node':
         specifier: ^25.1.0
@@ -30,12 +36,6 @@ importers:
       concurrently:
         specifier: ^9.2.1
         version: 9.2.1
-      elm:
-        specifier: 0.19.1-6
-        version: 0.19.1-6
-      elm-codegen:
-        specifier: ^0.6.3
-        version: 0.6.3
       elm-test:
         specifier: 0.19.1-revision17
         version: 0.19.1-revision17
@@ -48,9 +48,9 @@ importers:
       tsx:
         specifier: ^4.21.0
         version: 4.21.0
-      typescript:
-        specifier: ^5.9.3
-        version: 5.9.3
+      zod:
+        specifier: ^4.3.6
+        version: 4.3.6
 
 packages:
 

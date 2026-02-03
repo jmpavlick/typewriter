@@ -1,16 +1,17 @@
 import * as fs from "../lib/fs.js"
 import path from "path"
 import { ResultAsync } from "neverthrow"
+import * as ElmCodegen from "../lib/elmCodegen.js"
 
-export const init: ResultAsync<void, unknown> = (() => {
+export const init = (): ResultAsync<void, unknown> => {
   const __dirname = fs.toModuleDir(import.meta.url)
   const templatesDir = path.join(__dirname, "..", "..", "templates")
 
   return fs
     .cwd()
-    .andThrough((targetDir) => fs.mkdir("./.typewriter"))
     .andThen((targetDir) =>
       ResultAsync.combineWithAllErrors([
+        fs.mkdir("./.typewriter", { recursive: true }),
         fs.copyFile(
           path.join(templatesDir, "sampleSchema.ts"),
           path.join(targetDir, "sampleSchema.ts"),
@@ -23,4 +24,4 @@ export const init: ResultAsync<void, unknown> = (() => {
         ),
       ]).map(() => {})
     )
-})()
+}

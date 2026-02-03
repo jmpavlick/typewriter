@@ -23,6 +23,7 @@
     "test:ts": "pnpm typecheck && tsx index.ts",
     "test:ts:watch": "chokidar \"tsconfig.json\" \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
     "test:watch": "concurrently \"pnpm test:elm:watch\" \"pnpm test:ts:watch\"",
+    "test-install": "pnpm build && (cd ../typewriter-install-test && rm -rf node_modules/@jmpavlick codegen generated .typewriter && pnpm install && echo '\n=== Running init ===' && npx typewriter init && echo '\n=== Running generate ===' && npx typewriter generate && echo '\n=== Generated files ===' && ls -la generated/ 2>&1 || echo 'No generated directory')",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm build"
   },

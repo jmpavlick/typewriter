@@ -6,17 +6,12 @@ import { ConfigParams, configParams, type Config } from "./src/config.js"
 import * as ElmCodegen from "./lib/elmCodegen.js"
 import path from "path"
 import { type RunProps, run } from "./src/main.js"
-import ouroboros from "./src/ouroboros.js"
 import { md5Async, parseJsonSafe } from "./lib/neverthrow/ext.js"
 import * as fs from "./lib/fs.js"
 import { fromPromise, okAsync, ResultAsync } from "neverthrow"
 import { fileURLToPath } from "url"
 import { init } from "./src/init.js"
-
-const base = {
-  ...ouroboros,
-  root: path.resolve(ouroboros.root),
-}
+import { toConfig } from "./src/config.js"
 
 const toRunPropsEntries = ({
   root,
@@ -62,67 +57,39 @@ const toRunPropsEntries = ({
   return Array.from(Object.entries(sections)).flatMap(fromSection)
 }
 
-const compareBaseConfigHashes: ResultAsync<{ configWasWritten: boolean }, unknown> = md5Async(base)
-  .andThen((baseMd5) =>
-    fs
-      .readFile(base.baseConfigMd5Path)
-      .orElse((err) => okAsync(""))
-      .map((workdirBaseMd5) => ({
-        baseMd5,
-        workdirBaseMd5,
-      }))
-  )
-  .andThen(({ baseMd5, workdirBaseMd5 }) => {
-    const writeIO = fs.writeFileUtf8(base.baseConfigMd5Path, baseMd5, {
-      overwrite: true,
-    })
+const runAllRunPropsEntries = (runPropsEntries: RunProps[]): ResultAsync<void, unknown> =>
+  ResultAsync.combineWithAllErrors(runPropsEntries.map(run))
+    .map(() => {})
+    .mapErr((errs) => errs as unknown)
 
-    return baseMd5 === workdirBaseMd5
-      ? okAsync({ configWasWritten: false })
-      : writeIO.map(() => ({ configWasWritten: true }))
-  })
-
-const runAllRunPropsEntries =
-  ({ configWasWritten }: { configWasWritten: boolean }) =>
-  (runPropsEntries: RunProps[]): ResultAsync<void, unknown> =>
-    ResultAsync.combineWithAllErrors(
-      runPropsEntries
-        .map((rp) =>
-          configWasWritten === false
-            ? rp
-            : { ...rp, elmCodegenConfig: { ...rp.elmCodegenConfig, cleanFirst: true } }
-        )
-        .map(run)
+const getUserConfig = (): ResultAsync<Config, unknown> =>
+  fs
+    .cwd()
+    .andThen((cwd) =>
+      fromPromise(import(path.join(cwd, "typewriter.config.ts")), (e) => e)
+        .map((module: any) => module.default)
+        .map((userConfigParams) => ({ cwd, userConfigParams }))
     )
-      .map(() => {})
-      .mapErr((errs) => errs as unknown)
+    .orElse((err) =>
+      fs.cwd().map((cwd) => ({ cwd, userConfigParams: { sections: {} } }))
+    )
+    .andThen(({ cwd, userConfigParams }) =>
+      zx.parseResultAsync(configParams)(userConfigParams).map((params) => ({ cwd, params }))
+    )
+    .map(({ cwd, params }) =>
+      toConfig({ root: params.root ? path.resolve(cwd, params.root) : cwd, ...params })
+    )
 
-const runBaseSetup = ({
-  configWasWritten,
-}: {
-  configWasWritten: boolean
-}): ResultAsync<void, unknown> => {
-  const runPropsEntries = toRunPropsEntries(base)
-
-  const runIO = runAllRunPropsEntries({ configWasWritten })(runPropsEntries)
-
-  return configWasWritten ? runIO.map(() => {}) : okAsync()
-}
-
-const getUserConfig: ResultAsync<Config, unknown> = fs
-  .readFile(base.userConfigParamsPath)
-  .orElse(() =>
-    fs.cwd().andThen((cwd) => fromPromise(import(path.join(cwd, "typewriter.config.ts")), (e) => e))
-  )
-  .orElse(() => okAsync({ root: base.root, sections: {} }))
-  .andThen(zx.parseResultAsync(configParams))
-  .map((userConfigParams) => ({ ...base, configParams: userConfigParams }))
-
-const generate = compareBaseConfigHashes
-  .andThrough(runBaseSetup)
-  .andThrough((configStatus) =>
-    getUserConfig.map(toRunPropsEntries).andThen(runAllRunPropsEntries(configStatus))
-  )
+const generate = (): ResultAsync<void, unknown> =>
+  getUserConfig()
+    .orTee((err) => {
+      console.error("Failed to load user config:", err)
+    })
+    .map(toRunPropsEntries)
+    .andThen(runAllRunPropsEntries)
+    .orTee((err) => {
+      console.error("Failed to generate:", err)
+    })
 
 const command = z.union([z.literal("init"), z.literal("generate")])
 type Command = z.infer<typeof command>
@@ -135,30 +102,28 @@ if (
 ) {
   const commandArg = process.argv[2]
 
-  const result = await toCommand(commandArg)
+  await toCommand(commandArg)
     .orElse(() => okAsync("generate" as const))
     .andThen((cmd) => {
-      const io = () => {
-        switch (cmd) {
-          case "init":
-            return init.andTee(() => {
-              console.log("Init OK, try running npx typewriter generate")
-            })
-          case "generate":
-            return generate
-          default:
-            const _: never = cmd
-            throw new Error(`unsupported command: ${cmd}`)
-        }
+      switch (cmd) {
+        case "init":
+          return init()
+        case "generate":
+          return generate()
+        default:
+          const _: never = cmd
+          throw new Error(`unsupported command: ${cmd}`)
       }
-
-      return io()
     })
-    .orTee((err) => {
-      console.error(err)
-    })
-
-  result._unsafeUnwrap()
+    .match(
+      () => {
+        console.log("✓ Done")
+      },
+      (err) => {
+        console.error("✗ Error:", err)
+        process.exit(1)
+      }
+    )
 }
 
 // Export types for users

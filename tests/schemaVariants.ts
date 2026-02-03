@@ -294,6 +294,8 @@ export const simpleUser = z.object({
   }),
 })
 
+type SimpleUser = z.infer<typeof simpleUser>
+
 // unions
 
 export const unionOfScalars = z.union([z.string(), z.boolean(), z.number(), z.int()])
