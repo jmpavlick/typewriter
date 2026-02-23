@@ -66,4 +66,33 @@ suite =
                                 )
                             )
                         )
+        , test "should decode a union of string literals as an enum" <|
+            \() ->
+                -- z.enum(["a", "b"])
+                D.decodeString Ast.decoder """{"def":{"type":"enum","entries":{"a":"a","b":"b"}},"type":"enum","enum":{"a":"a","b":"b"},"options":["a","b"]}"""
+                    |> Expect.equal
+                        (Ok
+                            (SUnion
+                                (Dict.fromList
+                                    [ ( "A", [] )
+                                    , ( "B", [] )
+                                    ]
+                                )
+                            )
+                        )
+        , test "should decode a string literal" <|
+            \() ->
+                -- z.literal("hello")
+                D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello"]},"type":"literal","values":{}}"""
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [] ) ])))
+        , test "should decode a list of string literals" <|
+            \() ->
+                -- z.literal(["hello", "world"])
+                D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello","world"]},"type":"literal","values":{}}"""
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [] ), ( "World", [] ) ])))
+        , test "should decode a list of mixed literals" <|
+            \() ->
+                -- z.literal(["hello", false, true, 232])
+                D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello",false,true,232]},"type":"literal","values":{}}"""
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [] ), ( "LiteralFalse", [] ), ( "LiteralTrue", [] ), ( "Int_232", [] ) ])))
         ]

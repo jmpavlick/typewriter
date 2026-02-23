@@ -9,7 +9,7 @@ module Ast exposing
     , onOptional, onNullable
     , onArray, onRecord, onObject
     , onUnion
-    , onNullableOrOptionalFlat, optPara, para
+    , onLiteralBool, onLiteralInt, onLiteralString, onNullableOrOptionalFlat, optPara, para
     )
 
 {-|
@@ -56,6 +56,7 @@ module Ast exposing
 
 import Dict exposing (Dict)
 import Json.Decode as D exposing (Decoder)
+import String.Ext
 
 
 
@@ -89,7 +90,10 @@ type Value
     | SArray Value
     | SRecord Value
     | SObject (Dict String Value)
-    | SUnion (Dict String Value)
+    | SUnion (Dict String (List Value))
+    | SLiteralString String
+    | SLiteralInt Int
+    | SLiteralBool Bool
     | SUnimplemented String
 
 
@@ -111,12 +115,15 @@ type alias Props a =
     , sIsoTime : a
     , sIsoDate : a
     , sDateTime : a
+    , sLiteralString : String -> a
+    , sLiteralInt : Int -> a
+    , sLiteralBool : Bool -> a
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
     , sRecord : Value -> a -> a
     , sObject : Dict String Value -> Dict String a -> a
-    , sUnion : Dict String Value -> Dict String a -> a
+    , sUnion : Dict String (List Value) -> Dict String (List a) -> a
     , sUnimplemented : String -> a
     }
 
@@ -171,6 +178,15 @@ para props value =
         SDateTime ->
             props.sDateTime
 
+        SLiteralString s ->
+            props.sLiteralString s
+
+        SLiteralInt i ->
+            props.sLiteralInt i
+
+        SLiteralBool b ->
+            props.sLiteralBool b
+
         SOptional inner ->
             props.sOptional inner (para props inner)
 
@@ -187,7 +203,7 @@ para props value =
             props.sObject dict (Dict.map (\_ v -> para props v) dict)
 
         SUnion dict ->
-            props.sUnion dict (Dict.map (\_ v -> para props v) dict)
+            props.sUnion dict (Dict.map (\_ args -> List.map (para props) args) dict)
 
         SUnimplemented str ->
             props.sUnimplemented str
@@ -225,6 +241,9 @@ optPara attrs =
             , sIsoTime = Nothing
             , sIsoDate = Nothing
             , sDateTime = Nothing
+            , sLiteralString = \_ -> Nothing
+            , sLiteralInt = \_ -> Nothing
+            , sLiteralBool = \_ -> Nothing
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
@@ -328,6 +347,24 @@ onDateTime value base =
 
 
 {-| -}
+onLiteralString : (String -> Maybe a) -> Attr a
+onLiteralString fn base =
+    { base | sLiteralString = fn }
+
+
+{-| -}
+onLiteralInt : (Int -> Maybe a) -> Attr a
+onLiteralInt fn base =
+    { base | sLiteralInt = fn }
+
+
+{-| -}
+onLiteralBool : (Bool -> Maybe a) -> Attr a
+onLiteralBool fn base =
+    { base | sLiteralBool = fn }
+
+
+{-| -}
 onOptional : (Value -> Maybe a -> Maybe a) -> Attr a
 onOptional fn base =
     { base | sOptional = fn }
@@ -386,7 +423,7 @@ onObject fn base =
 
 
 {-| -}
-onUnion : (Dict String Value -> Dict String (Maybe a) -> Maybe a) -> Attr a
+onUnion : (Dict String (List Value) -> Dict String (List (Maybe a)) -> Maybe a) -> Attr a
 onUnion fn base =
     { base | sUnion = fn }
 
@@ -517,14 +554,33 @@ decodeHelp =
                             D.map SArray <|
                                 D.field "element" decoder
 
-                        "union" ->
-                            D.map (\options -> SUnion (Dict.fromList options)) <|
-                                D.field "options" <|
-                                    D.list
-                                        (D.map2 Tuple.pair
-                                            (D.oneOf [ D.field "format" D.string, D.field "type" D.string ])
-                                            decoder
-                                        )
+                        "enum" ->
+                            D.map (\entryDict -> SUnion (Dict.fromList <| List.map (\( k, _ ) -> ( String.Ext.toTypename k, [] )) <| Dict.toList entryDict)) <|
+                                D.at [ "def", "entries" ] <|
+                                    D.dict D.string
+
+                        "literal" ->
+                            let
+                                variantNameDecoder =
+                                    D.oneOf
+                                        [ D.map String.Ext.toTypename D.string
+                                        , D.map (String.Ext.toTypename << String.fromInt) D.int
+                                        , D.map
+                                            (\v ->
+                                                if v then
+                                                    "LiteralTrue"
+
+                                                else
+                                                    "LiteralFalse"
+                                            )
+                                            D.bool
+                                        ]
+
+                                thisDcdr =
+                                    D.map (\typenames -> SUnion <| Dict.fromList <| List.map (\t -> ( t, [] )) typenames) <|
+                                        D.at [ "def", "values" ] (D.list variantNameDecoder)
+                            in
+                            thisDcdr
 
                         _ ->
                             -- eventually we may handle more of zod's types

@@ -1,0 +1,446 @@
+{
+  "def": {
+    "type": "union",
+    "options": [
+      {
+        "def": {
+          "type": "object",
+          "shape": {
+            "tag": "user",
+            "user": {
+              "def": {
+                "type": "object",
+                "shape": {
+                  "id": {
+                    "def": {
+                      "type": "string"
+                    },
+                    "type": "string",
+                    "format": null,
+                    "minLength": null,
+                    "maxLength": null
+                  },
+                  "username": {
+                    "def": {
+                      "type": "string"
+                    },
+                    "type": "string",
+                    "format": null,
+                    "minLength": null,
+                    "maxLength": null
+                  },
+                  "emailAddresses": {
+                    "def": {
+                      "type": "array",
+                      "element": {
+                        "def": {
+                          "type": "string"
+                        },
+                        "type": "string",
+                        "format": null,
+                        "minLength": null,
+                        "maxLength": null
+                      }
+                    },
+                    "type": "array",
+                    "element": {
+                      "def": {
+                        "type": "string"
+                      },
+                      "type": "string",
+                      "format": null,
+                      "minLength": null,
+                      "maxLength": null
+                    }
+                  },
+                  "phoneNumber": {
+                    "def": {
+                      "type": "optional",
+                      "innerType": {
+                        "def": {
+                          "type": "string"
+                        },
+                        "type": "string",
+                        "format": null,
+                        "minLength": null,
+                        "maxLength": null
+                      }
+                    },
+                    "type": "optional"
+                  },
+                  "prefs": {
+                    "def": {
+                      "type": "object",
+                      "shape": {
+                        "lightMode": {
+                          "def": {
+                            "type": "boolean"
+                          },
+                          "type": "boolean"
+                        },
+                        "theme": {
+                          "def": {
+                            "type": "string"
+                          },
+                          "type": "string",
+                          "format": null,
+                          "minLength": null,
+                          "maxLength": null
+                        }
+                      }
+                    },
+                    "type": "object"
+                  }
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "type": "object"
+      },
+      {
+        "def": {
+          "type": "object",
+          "shape": {
+            "tag": "privilegedUser",
+            "user": {
+              "def": {
+                "type": "object",
+                "shape": {
+                  "role": {
+                    "def": {
+                      "type": "enum",
+                      "entries": {
+                        "admin": "admin",
+                        "moderator": "moderator"
+                      }
+                    },
+                    "type": "enum",
+                    "enum": {
+                      "admin": "admin",
+                      "moderator": "moderator"
+                    },
+                    "options": ["admin", "moderator"]
+                  },
+                  "user": {
+                    "def": {
+                      "type": "object",
+                      "shape": {
+                        "id": {
+                          "def": {
+                            "type": "string"
+                          },
+                          "type": "string",
+                          "format": null,
+                          "minLength": null,
+                          "maxLength": null
+                        },
+                        "username": {
+                          "def": {
+                            "type": "string"
+                          },
+                          "type": "string",
+                          "format": null,
+                          "minLength": null,
+                          "maxLength": null
+                        },
+                        "emailAddresses": {
+                          "def": {
+                            "type": "array",
+                            "element": {
+                              "def": {
+                                "type": "string"
+                              },
+                              "type": "string",
+                              "format": null,
+                              "minLength": null,
+                              "maxLength": null
+                            }
+                          },
+                          "type": "array",
+                          "element": {
+                            "def": {
+                              "type": "string"
+                            },
+                            "type": "string",
+                            "format": null,
+                            "minLength": null,
+                            "maxLength": null
+                          }
+                        },
+                        "phoneNumber": {
+                          "def": {
+                            "type": "optional",
+                            "innerType": {
+                              "def": {
+                                "type": "string"
+                              },
+                              "type": "string",
+                              "format": null,
+                              "minLength": null,
+                              "maxLength": null
+                            }
+                          },
+                          "type": "optional"
+                        },
+                        "prefs": {
+                          "def": {
+                            "type": "object",
+                            "shape": {
+                              "lightMode": {
+                                "def": {
+                                  "type": "boolean"
+                                },
+                                "type": "boolean"
+                              },
+                              "theme": {
+                                "def": {
+                                  "type": "string"
+                                },
+                                "type": "string",
+                                "format": null,
+                                "minLength": null,
+                                "maxLength": null
+                              }
+                            }
+                          },
+                          "type": "object"
+                        }
+                      }
+                    },
+                    "type": "object"
+                  }
+                }
+              },
+              "type": "object"
+            }
+          }
+        },
+        "type": "object"
+      }
+    ],
+    "discriminator": "tag",
+    "inclusive": false
+  },
+  "type": "union",
+  "options": [
+    {
+      "def": {
+        "type": "object",
+        "shape": {
+          "tag": "user",
+          "user": {
+            "def": {
+              "type": "object",
+              "shape": {
+                "id": {
+                  "def": {
+                    "type": "string"
+                  },
+                  "type": "string",
+                  "format": null,
+                  "minLength": null,
+                  "maxLength": null
+                },
+                "username": {
+                  "def": {
+                    "type": "string"
+                  },
+                  "type": "string",
+                  "format": null,
+                  "minLength": null,
+                  "maxLength": null
+                },
+                "emailAddresses": {
+                  "def": {
+                    "type": "array",
+                    "element": {
+                      "def": {
+                        "type": "string"
+                      },
+                      "type": "string",
+                      "format": null,
+                      "minLength": null,
+                      "maxLength": null
+                    }
+                  },
+                  "type": "array",
+                  "element": {
+                    "def": {
+                      "type": "string"
+                    },
+                    "type": "string",
+                    "format": null,
+                    "minLength": null,
+                    "maxLength": null
+                  }
+                },
+                "phoneNumber": {
+                  "def": {
+                    "type": "optional",
+                    "innerType": {
+                      "def": {
+                        "type": "string"
+                      },
+                      "type": "string",
+                      "format": null,
+                      "minLength": null,
+                      "maxLength": null
+                    }
+                  },
+                  "type": "optional"
+                },
+                "prefs": {
+                  "def": {
+                    "type": "object",
+                    "shape": {
+                      "lightMode": {
+                        "def": {
+                          "type": "boolean"
+                        },
+                        "type": "boolean"
+                      },
+                      "theme": {
+                        "def": {
+                          "type": "string"
+                        },
+                        "type": "string",
+                        "format": null,
+                        "minLength": null,
+                        "maxLength": null
+                      }
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "type": "object"
+    },
+    {
+      "def": {
+        "type": "object",
+        "shape": {
+          "tag": "privilegedUser",
+          "user": {
+            "def": {
+              "type": "object",
+              "shape": {
+                "role": {
+                  "def": {
+                    "type": "enum",
+                    "entries": {
+                      "admin": "admin",
+                      "moderator": "moderator"
+                    }
+                  },
+                  "type": "enum",
+                  "enum": {
+                    "admin": "admin",
+                    "moderator": "moderator"
+                  },
+                  "options": ["admin", "moderator"]
+                },
+                "user": {
+                  "def": {
+                    "type": "object",
+                    "shape": {
+                      "id": {
+                        "def": {
+                          "type": "string"
+                        },
+                        "type": "string",
+                        "format": null,
+                        "minLength": null,
+                        "maxLength": null
+                      },
+                      "username": {
+                        "def": {
+                          "type": "string"
+                        },
+                        "type": "string",
+                        "format": null,
+                        "minLength": null,
+                        "maxLength": null
+                      },
+                      "emailAddresses": {
+                        "def": {
+                          "type": "array",
+                          "element": {
+                            "def": {
+                              "type": "string"
+                            },
+                            "type": "string",
+                            "format": null,
+                            "minLength": null,
+                            "maxLength": null
+                          }
+                        },
+                        "type": "array",
+                        "element": {
+                          "def": {
+                            "type": "string"
+                          },
+                          "type": "string",
+                          "format": null,
+                          "minLength": null,
+                          "maxLength": null
+                        }
+                      },
+                      "phoneNumber": {
+                        "def": {
+                          "type": "optional",
+                          "innerType": {
+                            "def": {
+                              "type": "string"
+                            },
+                            "type": "string",
+                            "format": null,
+                            "minLength": null,
+                            "maxLength": null
+                          }
+                        },
+                        "type": "optional"
+                      },
+                      "prefs": {
+                        "def": {
+                          "type": "object",
+                          "shape": {
+                            "lightMode": {
+                              "def": {
+                                "type": "boolean"
+                              },
+                              "type": "boolean"
+                            },
+                            "theme": {
+                              "def": {
+                                "type": "string"
+                              },
+                              "type": "string",
+                              "format": null,
+                              "minLength": null,
+                              "maxLength": null
+                            }
+                          }
+                        },
+                        "type": "object"
+                      }
+                    }
+                  },
+                  "type": "object"
+                }
+              }
+            },
+            "type": "object"
+          }
+        }
+      },
+      "type": "object"
+    }
+  ]
+}
