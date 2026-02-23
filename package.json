@@ -18,7 +18,7 @@
   "scripts": {
     "build": "tsc",
     "dev": "pnpm typecheck; pnpm test:watch",
-    "test:elm": "elm-test && test:ts",
+    "test": "elm-test && test:ts",
     "test:elm:watch": "elm-test --watch --no-clear-console",
     "test:ts": "pnpm typecheck && tsx index.ts",
     "test:ts:watch": "chokidar \"tsconfig.json\" \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
