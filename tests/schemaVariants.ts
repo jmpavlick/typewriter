@@ -298,18 +298,19 @@ export const simpleUser = z.object({
 
 export const stringLiteral = z.literal("stringLiteral")
 
-// unions
-
 export const stringLiteralsAsEnum = z.enum(["red", "yellow", "blue"])
 
+// unions
+
+export const systemUser = z.discriminatedUnion("tag", [
+  z.object({ tag: "user", user: simpleUser }),
+  z.object({
+    tag: "privilegedUser",
+    user: z.object({ role: z.enum(["admin", "moderator"]), user: simpleUser }),
+  }),
+])
+
+// records
 export const recordInObject = z.object({
   sections: z.record(z.string(), z.object({ some: z.int(), recordThing: z.string() })),
 })
-
-// export const systemUser = z.discriminatedUnion("tag", [
-//   z.object({ tag: "user", user: simpleUser }),
-//   z.object({
-//     tag: "privilegedUser",
-//     user: z.object({ role: z.enum(["admin", "moderator"]), user: simpleUser }),
-//   }),
-// ])
