@@ -49,19 +49,20 @@
     "@types/node": "^25.1.0",
     "chokidar": "^5.0.0",
     "concurrently": "^9.2.1",
-    "prettier": "^3.8.1",
-    "tsx": "^4.21.0",
     "elm-test": "0.19.1-revision17",
     "elm-tooling": "^1.17.0",
+    "prettier": "^3.8.1",
+    "tsx": "^4.21.0",
     "zod": "^4.3.6"
   },
   "dependencies": {
-    "typescript": "^5.9.3",
+    "chokidar-cli": "^3.0.0",
+    "dedent": "^1.7.1",
     "elm": "0.19.1-6",
     "elm-codegen": "^0.6.3",
-    "dedent": "^1.7.1",
     "neverthrow": "^8.2.0",
-    "safe-stable-stringify": "^2.5.0"
+    "safe-stable-stringify": "^2.5.0",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "zod": "^4.3.6"
