@@ -21,6 +21,8 @@ import Gen.Time
 import Gen.Url
 import Gen.Url.Ext
 import List.Ext
+import Set exposing (Set)
+import String.Ext
 import String.Extra
 
 
@@ -31,12 +33,23 @@ import String.Extra
 build : List String -> Ast.Decl -> ( ( String, List String ), Maybe Elm.File )
 build path ( moduleName, typedef ) =
     let
+        -- pre-pass: name every nested unit-variant union so the traversal can reference it
+        -- and so we can hoist its declarations to the top of the module. a root-level union
+        -- becomes `Value` itself and is handled separately, so we skip the table for it.
+        table : UnionTable
+        table =
+            case typedef of
+                SUnion _ ->
+                    Dict.empty
+
+                _ ->
+                    buildUnionTable <| collectUnions (String.Ext.toTypename moduleName) typedef
+
         ( errs, decls ) =
-            List.Ext.partitionMapResult identity <|
-                List.Ext.concatAp typedef
-                    [ toTypeDecl >> List.singleton
-                    , toDecoderDecl >> List.singleton
-                    ]
+            List.Ext.partitionMapResult identity
+                [ toTypeDecl table typedef
+                , toDecoderDecl table typedef
+                ]
 
         buildFile =
             Elm.file (List.map (String.Extra.toTitleCase << String.Extra.camelize) <| List.concat [ path, [ moduleName ] ])
@@ -46,58 +59,16 @@ build path ( moduleName, typedef ) =
         Nothing
 
       else
-        Just <| buildFile decls
+        Just <| buildFile (decls ++ hoistedUnionDecls table)
     )
 
 
 
 -- TYPE DECLARATIONS
--- pardon the dust
 
 
-type Fragment
-    = Variants (List Elm.Variant)
-    | Annotation Type.Annotation
-
-
-liftAnnotationMap : (Type.Annotation -> Type.Annotation) -> (Fragment -> Fragment)
-liftAnnotationMap fn frag =
-    case frag of
-        -- this should be impossible, but Elm has no GADTs
-        -- so our play here is to make the impossible state im--
-        --
-        -- no wait a minute, what if we have, like
-        -- type State = On | Off
-        -- type alias Switch { name : String, state : State }
-        --
-        -- we're going to have to describe a tree for these fucking things aren't we
-        --
-        -- maybe not
-        -- read this convo with miniBill:
-        -- https://discord.com/channels/534524278847045633/892059254356332554/1467515610333315276
-        --
-        Variants _ ->
-            Annotation <| Type.named [] "Never"
-
-        Annotation ta ->
-            Annotation (fn ta)
-
-
-liftOptAnnotationMap : (Maybe Type.Annotation -> Maybe Type.Annotation) -> (Maybe Fragment -> Maybe Fragment)
-liftOptAnnotationMap fn maybeFrag =
-    case maybeFrag of
-        Just (Variants _) ->
-            Nothing
-
-        Just (Annotation ta) ->
-            Maybe.map Annotation (fn (Just ta))
-
-        Nothing ->
-            Maybe.map Annotation (fn Nothing)
-
-
-typeAnnotationAttrs : List (Ast.Attr Type.Annotation)
-typeAnnotationAttrs =
+typeAnnotationAttrs : UnionTable -> List (Ast.Attr Type.Annotation)
+typeAnnotationAttrs table =
     [ -- leaves
       Ast.onString Type.string
     , Ast.onInt Type.int
@@ -131,37 +102,28 @@ typeAnnotationAttrs =
                 |> Maybe.map Type.record
         )
 
-    -- , Ast.onUnion
-    --     (\_ dictOfMaybeAnnotations ->
-    --         let
-    --             flat =
-    --                 Dict.fromList <|
-    --                     Maybe.Extra.values <|
-    --                         List.map (\( k, maybeV ) -> Maybe.map (\v -> ( k, v )) maybeV) <|
-    --                             Dict.toList dictOfMaybeAnnotations
-    --         in
-    --         toCustomTypeVariants Nothing flat
-    --     )
+    -- a nested unit-variant union resolves to a reference to its hoisted top-level type
+    , Ast.onUnion
+        (\rawVariants _ ->
+            lookupUnion table rawVariants
+                |> Maybe.map (\info -> Type.named [] info.name)
+        )
     ]
 
 
-toTypeDecl : Ast.Value -> Result String Elm.Declaration
-toTypeDecl value =
+toTypeDecl : UnionTable -> Ast.Value -> Result String Elm.Declaration
+toTypeDecl table value =
     case value of
         -- a union at the root of a decl becomes a custom type named `Value`.
-        -- nested unions still fall through to `optPara` (and currently degrade to the
-        -- error module) — hoisting those to named top-level types is the next step.
+        -- nested unions are hoisted to their own top-level types (see hoistedUnionDecls)
+        -- and referenced by name from within this declaration.
         SUnion variants ->
             toUnitUnion variants
-                |> Result.map
-                    (\units ->
-                        Elm.customType "Value"
-                            (List.map (\u -> Elm.variant u.ctor) units)
-                    )
+                |> Result.map (unionTypeDecl "Value" "")
 
         _ ->
             value
-                |> Ast.optPara typeAnnotationAttrs
+                |> Ast.optPara (typeAnnotationAttrs table)
                 |> Result.fromMaybe "No type mapped for this AST value"
                 |> Result.map (Elm.alias "Value")
 
@@ -178,6 +140,186 @@ type WireValue
 
 type alias UnitVariant =
     { ctor : String, wire : WireValue }
+
+
+
+-- UNION SYMBOL TABLE
+-- a first pass names every nested unit-variant union by its structural identity, so the
+-- traversal can reference it and we can hoist its declarations to the top of the module.
+
+
+{-| keyed by structural identity (sorted variant set) so structurally identical unions
+encountered at different paths collapse to a single shared declaration
+-}
+type alias UnionTable =
+    Dict String UnionInfo
+
+
+type alias UnionInfo =
+    { name : String, variants : List UnitVariant }
+
+
+{-| canonical structural identity for a unit union, independent of where it appears -}
+structuralKey : List UnitVariant -> String
+structuralKey units =
+    units
+        |> List.map
+            (\u ->
+                u.ctor
+                    ++ "="
+                    ++ (case u.wire of
+                            WireString s ->
+                                "s:" ++ s
+
+                            WireInt i ->
+                                "i:" ++ String.fromInt i
+
+                            WireBool b ->
+                                "b:"
+                                    ++ (if b then
+                                            "true"
+
+                                        else
+                                            "false"
+                                       )
+                       )
+            )
+        |> List.sort
+        |> String.join "|"
+
+
+{-| look up the hoisted type for a raw union variant dict, if it classifies as a unit union -}
+lookupUnion : UnionTable -> Dict String (List Ast.Value) -> Maybe UnionInfo
+lookupUnion table rawVariants =
+    case toUnitUnion rawVariants of
+        Ok units ->
+            Dict.get (structuralKey units) table
+
+        Err _ ->
+            Nothing
+
+
+{-| walk the AST collecting every nested unit-variant union, carrying a breadcrumb-derived
+suggested name (an object field contributes its field name; wrapper nodes pass through).
+Returns (structuralKey, suggestedName, variants) in a stable order.
+-}
+collectUnions : String -> Ast.Value -> List ( String, String, List UnitVariant )
+collectUnions suggested value =
+    case value of
+        SObject dict ->
+            Dict.toList dict
+                |> List.concatMap (\( k, v ) -> collectUnions (String.Ext.toTypename k) v)
+
+        SArray inner ->
+            collectUnions suggested inner
+
+        SRecord inner ->
+            collectUnions suggested inner
+
+        SOptional inner ->
+            collectUnions suggested inner
+
+        SNullable inner ->
+            collectUnions suggested inner
+
+        SUnion variants ->
+            case toUnitUnion variants of
+                Ok units ->
+                    [ ( structuralKey units, suggested, units ) ]
+
+                Err _ ->
+                    -- structural union (not yet code-generable): still recurse into its
+                    -- option payloads in case a generatable union is nested deeper
+                    Dict.toList variants
+                        |> List.concatMap (\( _, args ) -> List.concatMap (collectUnions suggested) args)
+
+        _ ->
+            []
+
+
+{-| assign a unique Elm type name to each distinct structural union. structurally identical
+unions dedupe to one name; distinct unions that want the same name get a numeric suffix.
+-}
+buildUnionTable : List ( String, String, List UnitVariant ) -> UnionTable
+buildUnionTable collected =
+    let
+        uniquify : String -> Set String -> String
+        uniquify base used =
+            let
+                go n =
+                    let
+                        candidate =
+                            base ++ "_" ++ String.fromInt n
+                    in
+                    if Set.member candidate used then
+                        go (n + 1)
+
+                    else
+                        candidate
+            in
+            if Set.member base used then
+                go 2
+
+            else
+                base
+    in
+    collected
+        |> List.foldl
+            (\( key, suggested, units ) ( table, used ) ->
+                if Dict.member key table then
+                    ( table, used )
+
+                else
+                    let
+                        name =
+                            uniquify suggested used
+                    in
+                    ( Dict.insert key { name = name, variants = units } table
+                    , Set.insert name used
+                    )
+            )
+            ( Dict.empty, Set.empty )
+        |> Tuple.first
+
+
+{-| the name of a union's generated decoder declaration, e.g. `Group` -> `groupDecoder` -}
+decoderName : String -> String
+decoderName typeName =
+    String.Ext.toValidIdentifier typeName ++ "Decoder"
+
+
+{-| Elm custom-type constructors share the module namespace, so two hoisted unions in the
+same module that share a variant name (e.g. both have `User`) would collide. We disambiguate
+by prefixing each hoisted union's constructors with its type name (`Group` -> `GroupUser`).
+Root-level unions are the only type in their module, so they keep clean bare names.
+-}
+variantCtor : String -> UnitVariant -> String
+variantCtor prefix u =
+    prefix ++ u.ctor
+
+
+{-| the `type X = ...` declaration for a unit union -}
+unionTypeDecl : String -> String -> List UnitVariant -> Elm.Declaration
+unionTypeDecl name prefix units =
+    Elm.customType name (List.map (\u -> Elm.variant (variantCtor prefix u)) units)
+
+
+{-| hoist every collected nested union to a top-level type + decoder declaration -}
+hoistedUnionDecls : UnionTable -> List Elm.Declaration
+hoistedUnionDecls table =
+    Dict.values table
+        |> List.concatMap
+            (\info ->
+                case unitUnionDecoder info.name info.name info.variants of
+                    Ok dec ->
+                        [ unionTypeDecl info.name info.name info.variants
+                        , Elm.declaration (decoderName info.name) dec
+                        ]
+
+                    Err _ ->
+                        -- type is still useful even if we can't yet build the decoder
+                        [ unionTypeDecl info.name info.name info.variants ]
+            )
 
 
 {-| Classify a union's variant dict as a set of unit (payload-free) variants, recovering
@@ -210,14 +352,14 @@ toUnitUnion variants =
 {-| Build the decoder for a unit-variant union: match the wire value and emit the
 corresponding constructor. Only string-valued unions are supported so far.
 -}
-unitUnionDecoder : List UnitVariant -> Result String Elm.Expression
-unitUnionDecoder units =
+unitUnionDecoder : String -> String -> List UnitVariant -> Result String Elm.Expression
+unitUnionDecoder typeName prefix units =
     units
         |> List.map
             (\u ->
                 case u.wire of
                     WireString s ->
-                        Ok ( s, GD.succeed (Elm.val u.ctor) )
+                        Ok ( s, GD.succeed (Elm.val (variantCtor prefix u)) )
 
                     _ ->
                         Err "Only string-valued unit unions are supported so far (int/bool literal unions are a future step)"
@@ -227,7 +369,7 @@ unitUnionDecoder units =
             (\cases ->
                 -- same "trust me bro" annotation hack as toObjectDecoder: elm-codegen otherwise
                 -- infers the decoder's type from the last constructor reference (e.g. `Decoder yellow`)
-                Elm.withType (Type.named [] "Json.Decode.Decoder Value") <|
+                Elm.withType (Type.named [] ("Json.Decode.Decoder " ++ typeName)) <|
                     GD.andThen
                         (\s ->
                             Elm.Case.string s
@@ -243,8 +385,8 @@ unitUnionDecoder units =
 -- DECODERS
 
 
-decoderExprAttrs : List (Ast.Attr Elm.Expression)
-decoderExprAttrs =
+decoderExprAttrs : UnionTable -> List (Ast.Attr Elm.Expression)
+decoderExprAttrs table =
     [ -- leaves
       Ast.onString GD.string
     , Ast.onInt GD.int
@@ -286,20 +428,27 @@ decoderExprAttrs =
                     (Just [])
                 |> Maybe.map toObjectDecoder
         )
+
+    -- a nested unit-variant union decodes via a reference to its hoisted decoder
+    , Ast.onUnion
+        (\rawVariants _ ->
+            lookupUnion table rawVariants
+                |> Maybe.map (\info -> Elm.val (decoderName info.name))
+        )
     ]
 
 
-toDecoderDecl : Ast.Value -> Result String Elm.Declaration
-toDecoderDecl value =
+toDecoderDecl : UnionTable -> Ast.Value -> Result String Elm.Declaration
+toDecoderDecl table value =
     case value of
         SUnion variants ->
             toUnitUnion variants
-                |> Result.andThen unitUnionDecoder
+                |> Result.andThen (unitUnionDecoder "Value" "")
                 |> Result.map (Elm.declaration "decoder")
 
         _ ->
             value
-                |> Ast.optPara decoderExprAttrs
+                |> Ast.optPara (decoderExprAttrs table)
                 |> Result.fromMaybe "Could not create a valid decoder for this type"
                 |> Result.map (Elm.declaration "decoder")
 
