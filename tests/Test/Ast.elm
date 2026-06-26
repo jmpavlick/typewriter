@@ -95,4 +95,16 @@ suite =
                 -- z.literal(["hello", false, true, 232])
                 D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello",false,true,232]},"type":"literal","values":{}}"""
                     |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [ SLiteralString "hello" ] ), ( "LiteralFalse", [ SLiteralBool False ] ), ( "LiteralTrue", [ SLiteralBool True ] ), ( "Int_232", [ SLiteralInt 232 ] ) ])))
+        , test "should decode a discriminated union, keying variants by discriminant and stripping the tag from the payload" <|
+            \() ->
+                -- z.discriminatedUnion("tag", [ z.object({ tag: z.literal("user"), x: z.string() }) ])
+                D.decodeString Ast.decoder """{"def":{"type":"union","discriminator":"tag","options":[{"def":{"type":"object","shape":{"tag":{"def":{"type":"literal","values":["user"]},"type":"literal","values":{}},"x":{"def":{"type":"string"},"type":"string"}}},"type":"object"}]},"type":"union"}"""
+                    |> Expect.equal
+                        (Ok
+                            (SDiscriminatedUnion
+                                { discriminator = "tag"
+                                , variants = Dict.fromList [ ( "user", SObject (Dict.fromList [ ( "x", SString ) ]) ) ]
+                                }
+                            )
+                        )
         ]

@@ -2,13 +2,19 @@
 
 ## Status — 2026-06-26 attempt (go/no-go)
 
-**GO** on unit-variant unions (`z.literal`, `z.enum`, and `z.union` of literals), **both at the root of a decl and nested inside records/arrays**. Implemented end-to-end and verified: all 131 generated modules compile, 9 Elm tests pass. Error count dropped **4 → 1** (only the structural discriminated union `systemUser` remains).
+**GO — full union support across the test suite. Zero codegen errors; the `AaaaaaaaaErrors` module is no longer emitted.** All 132 generated modules compile; 10 Elm tests pass. Covers unit-variant unions (`z.literal`, `z.enum`, `z.union` of literals) **and** discriminated unions (`z.discriminatedUnion`), at the root of a decl and nested inside records/arrays.
 
-What now works (previously in the error module):
+What now works (all previously in the error module):
 - `stringLiteral` → `type Value = StringLiteral` + decoder matching `"stringLiteral"`
 - `stringLiteralsAsEnum` → `type Value = Blue | Red | Yellow` + string-matching decoder
 - `user` → nested unions are **hoisted to named top-level types** and referenced from the record:
   `identityProvider : IdentityProvider`, `group : Group`, `canEditPostsForMembersOfGroups : Maybe (List CanEditPostsForMembersOfGroups)`, each with a generated decoder.
+- `systemUser` → `type Value = PrivilegedUser { ... } | User { ... }` with a `D.field "tag"`-dispatched decoder; its nested `role` enum is hoisted to `type Role = RoleAdmin | RoleModerator` and referenced from the payload.
+
+### Discriminated unions — how it landed
+A dedicated AST node `SDiscriminatedUnion { discriminator, variants : Dict wireValue Value }` (additive — new `Props` field, `para` case, `optPara` base entry, `onDiscriminatedUnion` attr; existing `SUnion` untouched). The `"union"` decoder reads `def.discriminator`, decodes each object option, pulls the discriminant field's literal as the variant key, and strips it from the payload (`extractDiscriminatedVariants` in `Ast.elm`); it falls back through `D.oneOf` to the plain-union and `SUnimplemented` paths. The Builder generates `variantWith` constructors carrying the payload record and a `D.field discriminator |> D.andThen (case ...)` decoder (`discriminatedUnionTypeDecl` / `discriminatedUnionDecoder`). `collectUnions` recurses into payloads so nested unions there still hoist.
+
+**Test-schema fix:** `systemUser` was written `z.object({ tag: "user", ... })` with a raw string, which is **invalid Zod v4** (it throws at parse time — a raw string isn't a schema, so the discriminated-union machinery hits `undefined.values`). Corrected to `z.object({ tag: z.literal("user"), ... })`, the idiomatic form.
 
 ### Nested-union hoisting — how it landed (lighter than the planned GenMonad)
 Rather than the writer monad, a **pre-pass builds a symbol table** (`collectUnions` + `buildUnionTable` in `Builder.elm`) keyed by structural identity. The `optPara` traversal then just *looks up* a union's hoisted name (returning `Type.named [] name` / `Elm.val (decoderName name)`), and `build` appends the hoisted `type`/`decoder` declarations. The table is computed once and threaded into both attr passes — no `succeedWith`/accumulator-draining needed because naming is resolved up front, exactly as the SymbolTable section intended. `src/GenMonad.elm` was never needed; the SymbolTable lives inline in `Builder.elm`.
@@ -20,12 +26,13 @@ What changed vs. the original plan's assumptions:
 - **There was no `"union"` decoder case at all** — `z.union`/`z.discriminatedUnion` fell through to `SUnimplemented`. Added one that flattens literal options into a single variant dict and degrades gracefully (`D.oneOf [..., D.succeed SUnimplemented]`) for shapes it can't handle, so a bad union never hard-fails the whole file's decode.
 - **Record dispatch bug** (separate from unions): `para` routed `SRecord` through `props.sArray` (`Ast.elm:200`), so `z.record(z.string(), V)` came out as `List V` instead of `Dict String V`. One-line fix; `recordInObject` now correctly emits `Dict.Dict String {...}`.
 
-### NO-GO (the remaining boundary)
-- **Structural / object / discriminated unions** (`systemUser`): `toUnitUnion` rejects any variant with a non-literal payload, so these still land in the error module. The `D.oneOf` guard in the `"union"` decoder means they degrade gracefully rather than hard-failing. Two pieces of work remain here: (1) build object-variant decoders via `D.oneOf`/discriminant matching, and (2) the test schema writes discriminants as raw strings (`z.object({ tag: "user", ... })`) which Zod v4 does *not* wrap as `z.literal`, so `astify.ts`/the discriminator threading needs to capture the discriminant field + value per variant.
+### Remaining edges (none block the test suite)
+- **Nested discriminated unions**: a `z.discriminatedUnion` *inside* a record is not yet hoisted — `onDiscriminatedUnion` isn't wired into the attr passes, so a nested one degrades (returns Nothing → its enclosing object would error). Root-level discriminated unions work; nested ones would need the same symbol-table hoisting the unit unions already get. (Not exercised by the current test schema.)
 - **int/bool-valued unit unions**: the classifier accepts them into the *type*, and `hoistedUnionDecls` still emits the type even when the decoder can't be built, but `unitUnionDecoder` only builds string-matching decoders so far (`Elm.Case.string`). Int needs if-chains or `Elm.Case.custom`; bool an `ifThen`. (Mixed-wire unions like `z.literal(["a", 1, true])` are inherently un-decodable from a single base decoder.)
+- **Plain object unions without a discriminant** (`z.union([objA, objB])`, no shared literal tag): still degrade — they need positional `D.oneOf` variant decoders. Only discriminated object unions are handled.
 - **Cross-module dedup**: the symbol table is per-decl/per-module; the same structural union referenced from two schemas gets its own copy in each output module. Fine for now (each module is self-contained).
 
-Touched: `src/Ast.elm` (record dispatch fix, wire-preserving enum/literal decoders, new `"union"` case), `src/Builder.elm` (root-union codegen + nested-union symbol table: `collectUnions`, `buildUnionTable`, `lookupUnion`, `structuralKey`, `hoistedUnionDecls`, table-threaded attr passes; removed dead `Fragment`/`liftAnnotationMap`), `tests/Test/Ast.elm` (updated 4 expectations).
+Touched: `src/Ast.elm` (record dispatch fix, wire-preserving enum/literal decoders, new `"union"` case, `SDiscriminatedUnion` node + `extractDiscriminatedVariants`), `src/Builder.elm` (root-union codegen, nested-union symbol table, discriminated-union codegen; removed dead `Fragment`/`liftAnnotationMap`), `tests/schemaVariants.ts` (fixed malformed `systemUser`), `tests/Test/Ast.elm` (updated 4 expectations + added discriminated-union test).
 
 ---
 

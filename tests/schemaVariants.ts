@@ -303,9 +303,9 @@ export const stringLiteralsAsEnum = z.enum(["red", "yellow", "blue"])
 // unions
 
 export const systemUser = z.discriminatedUnion("tag", [
-  z.object({ tag: "user", user: simpleUser }),
+  z.object({ tag: z.literal("user"), user: simpleUser }),
   z.object({
-    tag: "privilegedUser",
+    tag: z.literal("privilegedUser"),
     user: z.object({ role: z.enum(["admin", "moderator"]), user: simpleUser }),
   }),
 ])

@@ -121,6 +121,9 @@ toTypeDecl table value =
             toUnitUnion variants
                 |> Result.map (unionTypeDecl "Value" "")
 
+        SDiscriminatedUnion du ->
+            discriminatedUnionTypeDecl table "Value" "" du
+
         _ ->
             value
                 |> Ast.optPara (typeAnnotationAttrs table)
@@ -233,6 +236,12 @@ collectUnions suggested value =
                     Dict.toList variants
                         |> List.concatMap (\( _, args ) -> List.concatMap (collectUnions suggested) args)
 
+        SDiscriminatedUnion du ->
+            -- recurse into each variant payload so nested unions there (e.g. a z.enum field)
+            -- still get hoisted; the discriminated union itself is generated inline for now
+            Dict.toList du.variants
+                |> List.concatMap (\( wire, payload ) -> collectUnions (String.Ext.toTypename wire) payload)
+
         _ ->
             []
 
@@ -320,6 +329,64 @@ hoistedUnionDecls table =
                         -- type is still useful even if we can't yet build the decoder
                         [ unionTypeDecl info.name info.name info.variants ]
             )
+
+
+
+-- DISCRIMINATED UNIONS (z.discriminatedUnion)
+-- each variant carries an object payload (the option minus its discriminant field), so unlike
+-- unit unions these become `variantWith` constructors and a discriminant-matching decoder.
+
+
+{-| `type Value = User { ... } | PrivilegedUser { ... }` from a discriminated union -}
+discriminatedUnionTypeDecl : UnionTable -> String -> String -> { discriminator : String, variants : Dict String Ast.Value } -> Result String Elm.Declaration
+discriminatedUnionTypeDecl table typeName prefix du =
+    du.variants
+        |> Dict.toList
+        |> List.map
+            (\( wire, payload ) ->
+                Ast.optPara (typeAnnotationAttrs table) payload
+                    |> Result.fromMaybe ("Could not map payload for discriminated variant: " ++ wire)
+                    |> Result.map (\ann -> Elm.variantWith (discriminantCtor prefix wire) [ ann ])
+            )
+        |> List.foldr (Result.map2 (::)) (Ok [])
+        |> Result.map (Elm.customType typeName)
+
+
+{-| `D.field "tag" D.string |> D.andThen (\t -> case t of "user" -> D.map User userDecoder ...)` -}
+discriminatedUnionDecoder : UnionTable -> String -> String -> { discriminator : String, variants : Dict String Ast.Value } -> Result String Elm.Expression
+discriminatedUnionDecoder table typeName prefix du =
+    du.variants
+        |> Dict.toList
+        |> List.map
+            (\( wire, payload ) ->
+                Ast.optPara (decoderExprAttrs table) payload
+                    |> Result.fromMaybe ("Could not build decoder for discriminated variant: " ++ wire)
+                    |> Result.map
+                        (\dec ->
+                            ( wire
+                            , GD.map (\p -> Elm.apply (Elm.val (discriminantCtor prefix wire)) [ p ]) dec
+                            )
+                        )
+            )
+        |> List.foldr (Result.map2 (::)) (Ok [])
+        |> Result.map
+            (\cases ->
+                Elm.withType (Type.named [] ("Json.Decode.Decoder " ++ typeName)) <|
+                    GD.andThen
+                        (\tag ->
+                            Elm.Case.string tag
+                                { cases = cases
+                                , otherwise = GD.fail "Unexpected discriminator for this union"
+                                }
+                        )
+                        (GD.field du.discriminator GD.string)
+            )
+
+
+{-| constructor name for a discriminated variant, from its discriminant wire value -}
+discriminantCtor : String -> String -> String
+discriminantCtor prefix wire =
+    prefix ++ String.Ext.toTypename wire
 
 
 {-| Classify a union's variant dict as a set of unit (payload-free) variants, recovering
@@ -444,6 +511,10 @@ toDecoderDecl table value =
         SUnion variants ->
             toUnitUnion variants
                 |> Result.andThen (unitUnionDecoder "Value" "")
+                |> Result.map (Elm.declaration "decoder")
+
+        SDiscriminatedUnion du ->
+            discriminatedUnionDecoder table "Value" "" du
                 |> Result.map (Elm.declaration "decoder")
 
         _ ->
