@@ -1,5 +1,24 @@
 # Union Type Codegen Plan
 
+## Coverage map (2026-06-26)
+
+A regression guard now makes the test suite **fail loudly if the `AaaaaaaaaErrors` module is emitted** (`assertNoErrorModule` in `src/main.ts`): any schema that falls through to a `Debug.todo` placeholder fails the build instead of slipping by. So "did I forget to cover X?" is now answered mechanically — run `pnpm test`.
+
+**Supported (generates type + decoder, compiles):**
+- All primitives, optional/nullable/nullish, arrays, nested objects, `z.record` (→ `Dict String v`)
+- `z.tuple` of 2 or 3 items (→ Elm `( a, b )` / `( a, b, c )`)
+- `z.literal` / `z.enum` / `z.union` of literals — string, **int**, and **bool** wire types — at root and nested (nested ones hoisted to named top-level types)
+- `z.discriminatedUnion` — at root and **nested** (hoisted), with nested unions inside payloads also hoisted
+- `.default()` / `.catch()` — transparently unwrapped to the inner type
+- Object transformers (`.partial()`, `.extend()`, `.pick()`, `.omit()`) — resolve to plain objects, already work
+
+**Not yet supported (degrade to the error module → guard fails the build):**
+- `z.tuple` of 4+ items (Elm has no >3 tuples)
+- Mixed-wire literal unions (e.g. `z.literal(["a", 1])` — string + number can't share one base decoder)
+- `z.union` of non-literal, non-object options (e.g. `z.string().or(z.number())`) — needs a synthesized custom type with positional variants
+- Plain object unions with no discriminant (`z.union([objA, objB])`) — needs positional `D.oneOf`
+- `z.set`, `z.map`, `z.intersection`, `z.lazy`/recursive schemas, `z.nativeEnum`
+
 ## Status — 2026-06-26 attempt (go/no-go)
 
 **GO — full union support across the test suite. Zero codegen errors; the `AaaaaaaaaErrors` module is no longer emitted.** All 132 generated modules compile; 10 Elm tests pass. Covers unit-variant unions (`z.literal`, `z.enum`, `z.union` of literals) **and** discriminated unions (`z.discriminatedUnion`), at the root of a decl and nested inside records/arrays.

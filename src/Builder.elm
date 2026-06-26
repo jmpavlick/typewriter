@@ -5,6 +5,7 @@ import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
 import Elm.Case
+import Elm.Op
 import Elm.Ext exposing (pipeline)
 import Gen.BigInt
 import Gen.BigInt.Ext
@@ -41,6 +42,14 @@ build path ( moduleName, typedef ) =
             case typedef of
                 SUnion _ ->
                     Dict.empty
+
+                SDiscriminatedUnion du ->
+                    -- the root discriminated union becomes `Value` itself; only hoist unions
+                    -- nested inside its payloads
+                    buildUnionTable <|
+                        (Dict.toList du.variants
+                            |> List.concatMap (\( wire, payload ) -> collectUnions (String.Ext.toTypename wire) payload)
+                        )
 
                 _ ->
                     buildUnionTable <| collectUnions (String.Ext.toTypename moduleName) typedef
@@ -89,6 +98,19 @@ typeAnnotationAttrs table =
     -- nodes
     , Ast.onNullableOrOptionalFlat Type.maybe
     , Ast.onArray (always (Maybe.map Type.list))
+    , Ast.onTuple
+        (\_ items ->
+            case items of
+                [ Just a, Just b ] ->
+                    Just (Type.tuple a b)
+
+                [ Just a, Just b, Just c ] ->
+                    Just (Type.triple a b c)
+
+                _ ->
+                    -- Elm only has 2- and 3-tuples; longer tuples degrade
+                    Nothing
+        )
     , Ast.onRecord (always (Maybe.map <| Type.dict Type.string))
     , Ast.onObject
         (\_ dictOfMaybeAnnotations ->
@@ -106,6 +128,11 @@ typeAnnotationAttrs table =
     , Ast.onUnion
         (\rawVariants _ ->
             lookupUnion table rawVariants
+                |> Maybe.map (\info -> Type.named [] info.name)
+        )
+    , Ast.onDiscriminatedUnion
+        (\du _ ->
+            lookupDiscriminated table du
                 |> Maybe.map (\info -> Type.named [] info.name)
         )
     ]
@@ -151,15 +178,132 @@ type alias UnitVariant =
 -- traversal can reference it and we can hoist its declarations to the top of the module.
 
 
-{-| keyed by structural identity (sorted variant set) so structurally identical unions
-encountered at different paths collapse to a single shared declaration
+{-| keyed by structural identity so structurally identical unions encountered at different
+paths collapse to a single shared declaration
 -}
 type alias UnionTable =
     Dict String UnionInfo
 
 
 type alias UnionInfo =
-    { name : String, variants : List UnitVariant }
+    { name : String, kind : HoistedKind }
+
+
+{-| the two flavors of hoistable named union: a payload-free unit union (z.literal/z.enum)
+or a discriminated union whose variants carry object payloads -}
+type HoistedKind
+    = HoistUnit (List UnitVariant)
+    | HoistDiscriminated { discriminator : String, variants : Dict String Ast.Value }
+
+
+{-| one collected union awaiting a name, from the pre-pass walk -}
+type alias Collected =
+    { key : String, suggested : String, kind : HoistedKind }
+
+
+{-| canonical structural identity for any AST value, used to key (and dedupe) unions.
+mirrors the constructors of Ast.Value -}
+valueKey : Ast.Value -> String
+valueKey value =
+    case value of
+        SString ->
+            "str"
+
+        SInt ->
+            "int"
+
+        SFloat ->
+            "float"
+
+        SBool ->
+            "bool"
+
+        SAny ->
+            "any"
+
+        SUnknown ->
+            "unknown"
+
+        SVoid ->
+            "void"
+
+        SUndefined ->
+            "undef"
+
+        SNull ->
+            "null"
+
+        SNaN ->
+            "nan"
+
+        SUrl ->
+            "url"
+
+        SBigInt ->
+            "bigint"
+
+        SIsoTime ->
+            "isotime"
+
+        SIsoDate ->
+            "isodate"
+
+        SDateTime ->
+            "datetime"
+
+        SOptional inner ->
+            "opt(" ++ valueKey inner ++ ")"
+
+        SNullable inner ->
+            "nul(" ++ valueKey inner ++ ")"
+
+        SArray inner ->
+            "arr(" ++ valueKey inner ++ ")"
+
+        STuple items ->
+            "tup(" ++ (List.map valueKey items |> String.join ",") ++ ")"
+
+        SRecord inner ->
+            "rec(" ++ valueKey inner ++ ")"
+
+        SObject dict ->
+            "obj(" ++ (Dict.toList dict |> List.map (\( k, v ) -> k ++ ":" ++ valueKey v) |> String.join ",") ++ ")"
+
+        SUnion variants ->
+            "uni(" ++ (Dict.toList variants |> List.map (\( k, vs ) -> k ++ ":" ++ (List.map valueKey vs |> String.join "+")) |> String.join ",") ++ ")"
+
+        SDiscriminatedUnion du ->
+            "disc(" ++ du.discriminator ++ ";" ++ (Dict.toList du.variants |> List.map (\( k, v ) -> k ++ ":" ++ valueKey v) |> String.join ",") ++ ")"
+
+        SLiteralString s ->
+            "ls:" ++ s
+
+        SLiteralInt i ->
+            "li:" ++ String.fromInt i
+
+        SLiteralBool b ->
+            "lb:"
+                ++ (if b then
+                        "t"
+
+                    else
+                        "f"
+                   )
+
+        SUnimplemented s ->
+            "unimpl:" ++ s
+
+
+{-| structural key for a unit union -}
+unitKey : List UnitVariant -> String
+unitKey units =
+    "u|" ++ structuralKey units
+
+
+{-| structural key for a discriminated union -}
+discriminatedKey : { discriminator : String, variants : Dict String Ast.Value } -> String
+discriminatedKey du =
+    valueKey (SDiscriminatedUnion du)
 
 
 {-| canonical structural identity for a unit union, independent of where it appears -}
@@ -196,17 +340,23 @@ lookupUnion : UnionTable -> Dict String (List Ast.Value) -> Maybe UnionInfo
 lookupUnion table rawVariants =
     case toUnitUnion rawVariants of
         Ok units ->
-            Dict.get (structuralKey units) table
+            Dict.get (unitKey units) table
 
         Err _ ->
             Nothing
 
 
-{-| walk the AST collecting every nested unit-variant union, carrying a breadcrumb-derived
-suggested name (an object field contributes its field name; wrapper nodes pass through).
-Returns (structuralKey, suggestedName, variants) in a stable order.
+{-| look up the hoisted type for a discriminated union -}
+lookupDiscriminated : UnionTable -> { discriminator : String, variants : Dict String Ast.Value } -> Maybe UnionInfo
+lookupDiscriminated table du =
+    Dict.get (discriminatedKey du) table
+
+
+{-| walk the AST collecting every hoistable union (unit or discriminated), carrying a
+breadcrumb-derived suggested name (an object field contributes its field name; wrapper nodes
+pass through). Returns collected entries in a stable order.
 -}
-collectUnions : String -> Ast.Value -> List ( String, String, List UnitVariant )
+collectUnions : String -> Ast.Value -> List Collected
 collectUnions suggested value =
     case value of
         SObject dict ->
@@ -215,6 +365,9 @@ collectUnions suggested value =
 
         SArray inner ->
             collectUnions suggested inner
+
+        STuple items ->
+            List.concatMap (collectUnions suggested) items
 
         SRecord inner ->
             collectUnions suggested inner
@@ -228,7 +381,7 @@ collectUnions suggested value =
         SUnion variants ->
             case toUnitUnion variants of
                 Ok units ->
-                    [ ( structuralKey units, suggested, units ) ]
+                    [ { key = unitKey units, suggested = suggested, kind = HoistUnit units } ]
 
                 Err _ ->
                     -- structural union (not yet code-generable): still recurse into its
@@ -237,10 +390,12 @@ collectUnions suggested value =
                         |> List.concatMap (\( _, args ) -> List.concatMap (collectUnions suggested) args)
 
         SDiscriminatedUnion du ->
-            -- recurse into each variant payload so nested unions there (e.g. a z.enum field)
-            -- still get hoisted; the discriminated union itself is generated inline for now
-            Dict.toList du.variants
-                |> List.concatMap (\( wire, payload ) -> collectUnions (String.Ext.toTypename wire) payload)
+            -- register the discriminated union itself, then recurse into payloads so any
+            -- nested unions there (e.g. a z.enum field) are hoisted too
+            { key = discriminatedKey du, suggested = suggested, kind = HoistDiscriminated du }
+                :: (Dict.toList du.variants
+                        |> List.concatMap (\( wire, payload ) -> collectUnions (String.Ext.toTypename wire) payload)
+                   )
 
         _ ->
             []
@@ -249,7 +404,7 @@ collectUnions suggested value =
 {-| assign a unique Elm type name to each distinct structural union. structurally identical
 unions dedupe to one name; distinct unions that want the same name get a numeric suffix.
 -}
-buildUnionTable : List ( String, String, List UnitVariant ) -> UnionTable
+buildUnionTable : List Collected -> UnionTable
 buildUnionTable collected =
     let
         uniquify : String -> Set String -> String
@@ -274,7 +429,7 @@ buildUnionTable collected =
     in
     collected
         |> List.foldl
-            (\( key, suggested, units ) ( table, used ) ->
+            (\{ key, suggested, kind } ( table, used ) ->
                 if Dict.member key table then
                     ( table, used )
 
@@ -283,7 +438,7 @@ buildUnionTable collected =
                         name =
                             uniquify suggested used
                     in
-                    ( Dict.insert key { name = name, variants = units } table
+                    ( Dict.insert key { name = name, kind = kind } table
                     , Set.insert name used
                     )
             )
@@ -313,21 +468,35 @@ unionTypeDecl name prefix units =
     Elm.customType name (List.map (\u -> Elm.variant (variantCtor prefix u)) units)
 
 
-{-| hoist every collected nested union to a top-level type + decoder declaration -}
+{-| hoist every collected nested union to a top-level type + decoder declaration. Hoisted
+unions prefix their constructors with the type name to avoid cross-type collisions. -}
 hoistedUnionDecls : UnionTable -> List Elm.Declaration
 hoistedUnionDecls table =
     Dict.values table
         |> List.concatMap
-            (\info ->
-                case unitUnionDecoder info.name info.name info.variants of
-                    Ok dec ->
-                        [ unionTypeDecl info.name info.name info.variants
-                        , Elm.declaration (decoderName info.name) dec
-                        ]
+            (\{ name, kind } ->
+                case kind of
+                    HoistUnit units ->
+                        case unitUnionDecoder name name units of
+                            Ok dec ->
+                                [ unionTypeDecl name name units
+                                , Elm.declaration (decoderName name) dec
+                                ]
 
-                    Err _ ->
-                        -- type is still useful even if we can't yet build the decoder
-                        [ unionTypeDecl info.name info.name info.variants ]
+                            Err _ ->
+                                -- type is still useful even if we can't yet build the decoder
+                                [ unionTypeDecl name name units ]
+
+                    HoistDiscriminated du ->
+                        case ( discriminatedUnionTypeDecl table name name du, discriminatedUnionDecoder table name name du ) of
+                            ( Ok typeDecl, Ok dec ) ->
+                                [ typeDecl, Elm.declaration (decoderName name) dec ]
+
+                            ( Ok typeDecl, Err _ ) ->
+                                [ typeDecl ]
+
+                            _ ->
+                                []
             )
 
 
@@ -416,36 +585,91 @@ toUnitUnion variants =
         |> List.foldr (Result.map2 (::)) (Ok [])
 
 
-{-| Build the decoder for a unit-variant union: match the wire value and emit the
-corresponding constructor. Only string-valued unions are supported so far.
+{-| Build the decoder for a unit-variant union: read the wire value and emit the matching
+constructor. Handles homogeneous string, int, or bool unions; a union mixing wire types
+(e.g. a string variant and a number variant) can't share one base decoder and is rejected.
 -}
 unitUnionDecoder : String -> String -> List UnitVariant -> Result String Elm.Expression
 unitUnionDecoder typeName prefix units =
-    units
-        |> List.map
-            (\u ->
-                case u.wire of
-                    WireString s ->
-                        Ok ( s, GD.succeed (Elm.val (variantCtor prefix u)) )
+    let
+        -- elm-codegen otherwise infers the decoder's type from the last constructor reference
+        -- (e.g. `Decoder yellow`); pin it explicitly
+        wrap : Elm.Expression -> Elm.Expression
+        wrap =
+            Elm.withType (Type.named [] ("Json.Decode.Decoder " ++ typeName))
 
-                    _ ->
-                        Err "Only string-valued unit unions are supported so far (int/bool literal unions are a future step)"
-            )
-        |> List.foldr (Result.map2 (::)) (Ok [])
-        |> Result.map
-            (\cases ->
-                -- same "trust me bro" annotation hack as toObjectDecoder: elm-codegen otherwise
-                -- infers the decoder's type from the last constructor reference (e.g. `Decoder yellow`)
-                Elm.withType (Type.named [] ("Json.Decode.Decoder " ++ typeName)) <|
-                    GD.andThen
-                        (\s ->
-                            Elm.Case.string s
-                                { cases = cases
-                                , otherwise = GD.fail "Unexpected value for this union"
-                                }
-                        )
-                        GD.string
-            )
+        ctorOf : UnitVariant -> Elm.Expression
+        ctorOf u =
+            Elm.val (variantCtor prefix u)
+
+        -- `\v -> if v == lit1 then succeed C1 else if v == lit2 ... else fail`, for int/bool
+        equalityMatcher : (a -> Elm.Expression) -> List ( UnitVariant, a ) -> Elm.Expression -> Elm.Expression
+        equalityMatcher toLit pairs subject =
+            List.foldr
+                (\( u, lit ) acc -> Elm.ifThen (Elm.Op.equal subject (toLit lit)) (GD.succeed (ctorOf u)) acc)
+                (GD.fail ("Unexpected value for " ++ typeName))
+                pairs
+
+        pick : (WireValue -> Maybe a) -> List ( UnitVariant, a )
+        pick f =
+            List.filterMap (\u -> Maybe.map (\a -> ( u, a )) (f u.wire)) units
+
+        strings =
+            pick
+                (\w ->
+                    case w of
+                        WireString s ->
+                            Just s
+
+                        _ ->
+                            Nothing
+                )
+
+        ints =
+            pick
+                (\w ->
+                    case w of
+                        WireInt i ->
+                            Just i
+
+                        _ ->
+                            Nothing
+                )
+
+        bools =
+            pick
+                (\w ->
+                    case w of
+                        WireBool b ->
+                            Just b
+
+                        _ ->
+                            Nothing
+                )
+
+        n =
+            List.length units
+    in
+    if List.length strings == n then
+        Ok <|
+            wrap <|
+                GD.andThen
+                    (\s ->
+                        Elm.Case.string s
+                            { cases = List.map (\( u, sv ) -> ( sv, GD.succeed (ctorOf u) )) strings
+                            , otherwise = GD.fail ("Unexpected value for " ++ typeName)
+                            }
+                    )
+                    GD.string
+
+    else if List.length ints == n then
+        Ok <| wrap <| GD.andThen (equalityMatcher Elm.int ints) GD.int
+
+    else if List.length bools == n then
+        Ok <| wrap <| GD.andThen (equalityMatcher Elm.bool bools) GD.bool
+
+    else
+        Err "Mixed-wire union (e.g. string and number literal variants) can't share a single decoder"
 
 
 
@@ -480,6 +704,18 @@ decoderExprAttrs table =
                 ]
         )
     , Ast.onArray (\_ innerDecoder -> Maybe.map GD.list innerDecoder)
+    , Ast.onTuple
+        (\_ items ->
+            case items of
+                [ Just a, Just b ] ->
+                    Just (GD.map2 (\x y -> Elm.tuple x y) (GD.index 0 a) (GD.index 1 b))
+
+                [ Just a, Just b, Just c ] ->
+                    Just (GD.map3 (\x y z -> Elm.triple x y z) (GD.index 0 a) (GD.index 1 b) (GD.index 2 c))
+
+                _ ->
+                    Nothing
+        )
     , Ast.onRecord (\_ innerDecoder -> Maybe.map GD.dict innerDecoder)
     , Ast.onObject
         (\_ dictOfMaybeDecoders ->
@@ -502,6 +738,11 @@ decoderExprAttrs table =
             lookupUnion table rawVariants
                 |> Maybe.map (\info -> Elm.val (decoderName info.name))
         )
+    , Ast.onDiscriminatedUnion
+        (\du _ ->
+            lookupDiscriminated table du
+                |> Maybe.map (\info -> Elm.val (decoderName info.name))
+        )
     ]
 
 
@@ -521,6 +762,9 @@ toDecoderDecl table value =
             value
                 |> Ast.optPara (decoderExprAttrs table)
                 |> Result.fromMaybe "Could not create a valid decoder for this type"
+                -- pin the root decoder's type: elm-codegen otherwise infers type vars from
+                -- lambda arg names for tuple/record constructors (e.g. `Decoder ( unpack, ... )`)
+                |> Result.map (Elm.withType (Type.named [] "Json.Decode.Decoder Value"))
                 |> Result.map (Elm.declaration "decoder")
 
 

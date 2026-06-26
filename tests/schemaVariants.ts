@@ -300,6 +300,12 @@ export const stringLiteral = z.literal("stringLiteral")
 
 export const stringLiteralsAsEnum = z.enum(["red", "yellow", "blue"])
 
+export const intLiteral = z.literal(42)
+
+export const httpStatus = z.literal([200, 404, 500])
+
+export const boolLiteral = z.literal(true)
+
 // unions
 
 export const systemUser = z.discriminatedUnion("tag", [
@@ -309,6 +315,31 @@ export const systemUser = z.discriminatedUnion("tag", [
     user: z.object({ role: z.enum(["admin", "moderator"]), user: simpleUser }),
   }),
 ])
+
+// a discriminated union nested inside an object field (exercises hoisting of structural unions)
+export const notification = z.object({
+  id: z.string(),
+  payload: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("email"), to: z.email() }),
+    z.object({ kind: z.literal("sms"), phone: z.string() }),
+  ]),
+})
+
+// tuples
+export const pairTuple = z.tuple([z.string(), z.int()])
+export const tripleTuple = z.tuple([z.string(), z.int(), z.boolean()])
+export const tupleInObject = z.object({
+  coord: z.tuple([z.number(), z.number()]),
+  labeled: z.tuple([z.string(), z.array(z.int())]),
+})
+
+// transparent wrappers: .default() / .catch() unwrap to their inner type
+export const defaultedString = z.string().default("hello")
+export const caughtNumber = z.number().catch(0)
+export const wrappersInObject = z.object({
+  name: z.string().default("anon"),
+  retries: z.int().catch(3),
+})
 
 // records
 export const recordInObject = z.object({

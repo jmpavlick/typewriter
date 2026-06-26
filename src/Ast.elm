@@ -7,7 +7,7 @@ module Ast exposing
     , onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime
     , onUnimplemented
     , onOptional, onNullable
-    , onArray, onRecord, onObject
+    , onArray, onTuple, onRecord, onObject
     , onUnion, onDiscriminatedUnion
     , onLiteralBool, onLiteralInt, onLiteralString, onNullableOrOptionalFlat, optPara, para
     )
@@ -88,6 +88,7 @@ type Value
     | SOptional Value
     | SNullable Value
     | SArray Value
+    | STuple (List Value)
     | SRecord Value
     | SObject (Dict String Value)
     | SUnion (Dict String (List Value))
@@ -122,6 +123,7 @@ type alias Props a =
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
+    , sTuple : List Value -> List a -> a
     , sRecord : Value -> a -> a
     , sObject : Dict String Value -> Dict String a -> a
     , sUnion : Dict String (List Value) -> Dict String (List a) -> a
@@ -198,6 +200,9 @@ para props value =
         SArray inner ->
             props.sArray inner (para props inner)
 
+        STuple items ->
+            props.sTuple items (List.map (para props) items)
+
         SRecord inner ->
             props.sRecord inner (para props inner)
 
@@ -252,6 +257,7 @@ optPara attrs =
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
+            , sTuple = \_ _ -> Nothing
             , sRecord = \_ _ -> Nothing
             , sObject = \_ _ -> Nothing
             , sUnion = \_ _ -> Nothing
@@ -417,6 +423,12 @@ onArray fn base =
 
 
 {-| -}
+onTuple : (List Value -> List (Maybe a) -> Maybe a) -> Attr a
+onTuple fn base =
+    { base | sTuple = fn }
+
+
+{-| -}
 onRecord : (Value -> Maybe a -> Maybe a) -> Attr a
 onRecord fn base =
     { base | sRecord = fn }
@@ -565,6 +577,19 @@ decodeHelp =
                         "array" ->
                             D.map SArray <|
                                 D.field "element" decoder
+
+                        "tuple" ->
+                            D.map STuple <|
+                                D.at [ "def", "items" ] (D.list decoder)
+
+                        -- `.default(...)` and `.catch(...)` are transparent wrappers: the wire
+                        -- value is just the inner type (the default/fallback is a zod-runtime
+                        -- concern Elm's decoder doesn't model), so we unwrap to the inner schema.
+                        "default" ->
+                            D.at [ "def", "innerType" ] decoder
+
+                        "catch" ->
+                            D.at [ "def", "innerType" ] decoder
 
                         "union" ->
                             let

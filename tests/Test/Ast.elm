@@ -95,6 +95,16 @@ suite =
                 -- z.literal(["hello", false, true, 232])
                 D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello",false,true,232]},"type":"literal","values":{}}"""
                     |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [ SLiteralString "hello" ] ), ( "LiteralFalse", [ SLiteralBool False ] ), ( "LiteralTrue", [ SLiteralBool True ] ), ( "Int_232", [ SLiteralInt 232 ] ) ])))
+        , test "should decode a tuple as STuple of its item types" <|
+            \() ->
+                -- z.tuple([z.string(), z.boolean()])
+                D.decodeString Ast.decoder """{"def":{"type":"tuple","items":[{"def":{"type":"string"},"type":"string"},{"def":{"type":"boolean"},"type":"boolean"}]},"type":"tuple"}"""
+                    |> Expect.equal (Ok (STuple [ SString, SBool ]))
+        , test "should unwrap a .default() wrapper to its inner type" <|
+            \() ->
+                -- z.string().default("x")
+                D.decodeString Ast.decoder """{"def":{"type":"default","innerType":{"def":{"type":"string"},"type":"string"}},"type":"default"}"""
+                    |> Expect.equal (Ok SString)
         , test "should decode a discriminated union, keying variants by discriminant and stripping the tag from the payload" <|
             \() ->
                 -- z.discriminatedUnion("tag", [ z.object({ tag: z.literal("user"), x: z.string() }) ])
