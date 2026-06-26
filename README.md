@@ -2,9 +2,8 @@
 
 Generates Elm types and decoders from [Zod](https://zod.dev) schemas.
 
-This is a personal tool, not a published package. Point it at a `.ts` file that exports Zod
-schemas, run it, and get a directory of Elm modules — one per exported schema, each with a `Value`
-type and a `Json.Decode.Decoder Value`.
+Point it at a `.ts` file that exports Zod schemas, run it, and get a directory of Elm modules —
+one per exported schema, each with a `Value` type and a `Json.Decode.Decoder Value`.
 
 ## How to hold it
 
