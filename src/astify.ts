@@ -1,34 +1,29 @@
-import zx from "../lib/zod/ext.js"
 import z from "zod"
-import { ResultAsync, okAsync, errAsync, Result } from "neverthrow"
-import path from "path"
 
 // Schema for validating that imported module exports are zod schemas
 export const zodDecls = z.record(z.string(), z.instanceof(z.ZodType))
 export type ZodDecls = z.infer<typeof zodDecls>
 
-// Read a module and extract its exports as a plain object
-const readModule = (filepath: string): ResultAsync<Record<string, unknown>, unknown> =>
-  ResultAsync.fromPromise(
-    import(filepath),
-    (e) => `Failed to import from filepath ${filepath}: ${e}`
-  ).andThen(
-    Result.fromThrowable((m) =>
-      Object.fromEntries(
-        Object.entries(m).filter(([, obj]) => {
-          return obj instanceof z.ZodType
-        })
-      )
-    )
-  )
+// Read a module and keep only the exports that are zod schemas
+const readModule = async (filepath: string): Promise<Record<string, unknown>> => {
+  const module = await import(filepath)
 
-// Transform the module-object to zod schemas
-const toZodSchemas = (module: unknown): ResultAsync<ZodDecls, unknown> => {
   if (typeof module !== "object" || module === null) {
-    return errAsync(`Dynamic import failed; module contains no exports`)
+    throw new Error(`Dynamic import of ${filepath} produced no exports`)
   }
-  return zx.parseResultAsync(zodDecls)(module)
+
+  return Object.fromEntries(
+    Object.entries(module).filter(([, value]) => value instanceof z.ZodType)
+  )
 }
 
-export const execute = (inputPath: string): ResultAsync<ZodDecls, unknown> =>
-  readModule(inputPath).andThen(toZodSchemas)
+export const execute = async (inputPath: string): Promise<ZodDecls> => {
+  const module = await readModule(inputPath)
+  const parsed = await zodDecls.safeParseAsync(module)
+
+  if (!parsed.success) {
+    throw parsed.error
+  }
+
+  return parsed.data
+}

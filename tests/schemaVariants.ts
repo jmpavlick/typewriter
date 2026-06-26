@@ -294,12 +294,76 @@ export const simpleUser = z.object({
   }),
 })
 
-type SimpleUser = z.infer<typeof simpleUser>
+// literals
+
+export const stringLiteral = z.literal("stringLiteral")
+
+export const stringLiteralsAsEnum = z.enum(["red", "yellow", "blue"])
+
+export const intLiteral = z.literal(42)
+
+export const httpStatus = z.literal([200, 404, 500])
+
+export const boolLiteral = z.literal(true)
 
 // unions
 
-export const unionOfScalars = z.union([z.string(), z.boolean(), z.number(), z.int()])
+export const systemUser = z.discriminatedUnion("tag", [
+  z.object({ tag: z.literal("user"), user: simpleUser }),
+  z.object({
+    tag: z.literal("privilegedUser"),
+    user: z.object({ role: z.enum(["admin", "moderator"]), user: simpleUser }),
+  }),
+])
 
+// a discriminated union nested inside an object field (exercises hoisting of structural unions)
+export const notification = z.object({
+  id: z.string(),
+  payload: z.discriminatedUnion("kind", [
+    z.object({ kind: z.literal("email"), to: z.email() }),
+    z.object({ kind: z.literal("sms"), phone: z.string() }),
+  ]),
+})
+
+// tuples (2 -> pair, 3 -> triple, 4+ -> right-nested pairs)
+export const pairTuple = z.tuple([z.string(), z.int()])
+export const tripleTuple = z.tuple([z.string(), z.int(), z.boolean()])
+export const quintTuple = z.tuple([z.string(), z.int(), z.boolean(), z.number(), z.string()])
+export const tupleInObject = z.object({
+  coord: z.tuple([z.number(), z.number()]),
+  labeled: z.tuple([z.string(), z.array(z.int())]),
+})
+
+// sets (comparable element types only)
+export const stringSet = z.set(z.string())
+export const intSet = z.set(z.int())
+export const setInObject = z.object({ tags: z.set(z.string()) })
+
+// maps (string-keyed -> Dict)
+export const stringMap = z.map(z.string(), z.int())
+
+// native enums
+enum ColorEnum {
+  Red,
+  Green,
+  Blue,
+}
+enum NameEnum {
+  A = "a",
+  B = "b",
+}
+export const numericNativeEnum = z.nativeEnum(ColorEnum)
+export const stringNativeEnum = z.nativeEnum(NameEnum)
+
+// transparent wrappers: .default() / .catch() unwrap to their inner type
+export const defaultedString = z.string().default("hello")
+export const caughtNumber = z.number().catch(0)
+export const wrappersInObject = z.object({
+  name: z.string().default("anon"),
+  retries: z.int().catch(3),
+})
+
+// records
 export const recordInObject = z.object({
   sections: z.record(z.string(), z.object({ some: z.int(), recordThing: z.string() })),
 })

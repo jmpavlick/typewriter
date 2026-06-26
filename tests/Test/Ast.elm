@@ -66,4 +66,65 @@ suite =
                                 )
                             )
                         )
+        , test "should decode a union of string literals as an enum" <|
+            \() ->
+                -- z.enum(["a", "b"])
+                D.decodeString Ast.decoder """{"def":{"type":"enum","entries":{"a":"a","b":"b"}},"type":"enum","enum":{"a":"a","b":"b"},"options":["a","b"]}"""
+                    |> Expect.equal
+                        (Ok
+                            (SUnion
+                                (Dict.fromList
+                                    [ ( "A", [ SLiteralString "a" ] )
+                                    , ( "B", [ SLiteralString "b" ] )
+                                    ]
+                                )
+                            )
+                        )
+        , test "should decode a string literal" <|
+            \() ->
+                -- z.literal("hello")
+                D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello"]},"type":"literal","values":{}}"""
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [ SLiteralString "hello" ] ) ])))
+        , test "should decode a list of string literals" <|
+            \() ->
+                -- z.literal(["hello", "world"])
+                D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello","world"]},"type":"literal","values":{}}"""
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [ SLiteralString "hello" ] ), ( "World", [ SLiteralString "world" ] ) ])))
+        , test "should decode a list of mixed literals" <|
+            \() ->
+                -- z.literal(["hello", false, true, 232])
+                D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello",false,true,232]},"type":"literal","values":{}}"""
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [ SLiteralString "hello" ] ), ( "LiteralFalse", [ SLiteralBool False ] ), ( "LiteralTrue", [ SLiteralBool True ] ), ( "Int_232", [ SLiteralInt 232 ] ) ])))
+        , test "should decode a tuple as STuple of its item types" <|
+            \() ->
+                -- z.tuple([z.string(), z.boolean()])
+                D.decodeString Ast.decoder """{"def":{"type":"tuple","items":[{"def":{"type":"string"},"type":"string"},{"def":{"type":"boolean"},"type":"boolean"}]},"type":"tuple"}"""
+                    |> Expect.equal (Ok (STuple [ SString, SBool ]))
+        , test "should unwrap a .default() wrapper to its inner type" <|
+            \() ->
+                -- z.string().default("x")
+                D.decodeString Ast.decoder """{"def":{"type":"default","innerType":{"def":{"type":"string"},"type":"string"}},"type":"default"}"""
+                    |> Expect.equal (Ok SString)
+        , test "should decode a set as SSet of its element type" <|
+            \() ->
+                -- z.set(z.string())
+                D.decodeString Ast.decoder """{"def":{"type":"set","valueType":{"def":{"type":"string"},"type":"string"}},"type":"set"}"""
+                    |> Expect.equal (Ok (SSet SString))
+        , test "should decode a numeric nativeEnum (with TS reverse mappings) as an int-valued union" <|
+            \() ->
+                -- z.nativeEnum(enum { Red, Green }) — entries carry both forward and reverse mappings
+                D.decodeString Ast.decoder """{"def":{"type":"enum","entries":{"0":"Red","1":"Green","Red":0,"Green":1}},"type":"enum"}"""
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Green", [ SLiteralInt 1 ] ), ( "Red", [ SLiteralInt 0 ] ) ])))
+        , test "should decode a discriminated union, keying variants by discriminant and stripping the tag from the payload" <|
+            \() ->
+                -- z.discriminatedUnion("tag", [ z.object({ tag: z.literal("user"), x: z.string() }) ])
+                D.decodeString Ast.decoder """{"def":{"type":"union","discriminator":"tag","options":[{"def":{"type":"object","shape":{"tag":{"def":{"type":"literal","values":["user"]},"type":"literal","values":{}},"x":{"def":{"type":"string"},"type":"string"}}},"type":"object"}]},"type":"union"}"""
+                    |> Expect.equal
+                        (Ok
+                            (SDiscriminatedUnion
+                                { discriminator = "tag"
+                                , variants = Dict.fromList [ ( "user", SObject (Dict.fromList [ ( "x", SString ) ]) ) ]
+                                }
+                            )
+                        )
         ]

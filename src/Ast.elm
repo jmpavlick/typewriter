@@ -1,15 +1,15 @@
 module Ast exposing
     ( Decl, Value(..)
     , decoder
-    , para, optPara
     , Props, Attr
     , onString, onInt, onFloat, onBool
     , onAny, onUnknown, onVoid, onUndefined, onNull, onNaN
     , onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime
     , onUnimplemented
-    , onOptional, onNullable, onNullableOrOptionalFlat
-    , onArray, onRecord, onObject
-    , onUnion
+    , onOptional, onNullable
+    , onArray, onTuple, onSet, onRecord, onObject
+    , onUnion, onDiscriminatedUnion
+    , onLiteralBool, onLiteralInt, onLiteralString, onNullableOrOptionalFlat, optPara, para
     )
 
 {-|
@@ -27,7 +27,7 @@ module Ast exposing
 
 # The Blessed Paramorphism (calm down it's just a fancy `fold`)
 
-@docs para, optPara
+@docs para optPara
 
 
 # The Glorious F-Algebra (And Its Attribute Band)
@@ -48,7 +48,7 @@ module Ast exposing
 
 ### Node Attributes
 
-@docs onOptional, onNullable, onNullableOrOptionalFlat
+@docs onOptional, onNullable, onOptionalOrNullableFlat
 @docs onArray, onRecord, onObject
 @docs onUnion
 
@@ -56,6 +56,7 @@ module Ast exposing
 
 import Dict exposing (Dict)
 import Json.Decode as D exposing (Decoder)
+import String.Ext
 
 
 
@@ -87,9 +88,15 @@ type Value
     | SOptional Value
     | SNullable Value
     | SArray Value
+    | SSet Value
+    | STuple (List Value)
     | SRecord Value
     | SObject (Dict String Value)
-    | SUnion (Dict String Value)
+    | SUnion (Dict String (List Value))
+    | SDiscriminatedUnion { discriminator : String, variants : Dict String Value }
+    | SLiteralString String
+    | SLiteralInt Int
+    | SLiteralBool Bool
     | SUnimplemented String
 
 
@@ -111,12 +118,18 @@ type alias Props a =
     , sIsoTime : a
     , sIsoDate : a
     , sDateTime : a
+    , sLiteralString : String -> a
+    , sLiteralInt : Int -> a
+    , sLiteralBool : Bool -> a
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
+    , sSet : Value -> a -> a
+    , sTuple : List Value -> List a -> a
     , sRecord : Value -> a -> a
     , sObject : Dict String Value -> Dict String a -> a
-    , sUnion : Dict String Value -> Dict String a -> a
+    , sUnion : Dict String (List Value) -> Dict String (List a) -> a
+    , sDiscriminatedUnion : { discriminator : String, variants : Dict String Value } -> Dict String a -> a
     , sUnimplemented : String -> a
     }
 
@@ -171,6 +184,15 @@ para props value =
         SDateTime ->
             props.sDateTime
 
+        SLiteralString s ->
+            props.sLiteralString s
+
+        SLiteralInt i ->
+            props.sLiteralInt i
+
+        SLiteralBool b ->
+            props.sLiteralBool b
+
         SOptional inner ->
             props.sOptional inner (para props inner)
 
@@ -180,14 +202,23 @@ para props value =
         SArray inner ->
             props.sArray inner (para props inner)
 
+        SSet inner ->
+            props.sSet inner (para props inner)
+
+        STuple items ->
+            props.sTuple items (List.map (para props) items)
+
         SRecord inner ->
-            props.sArray inner (para props inner)
+            props.sRecord inner (para props inner)
 
         SObject dict ->
             props.sObject dict (Dict.map (\_ v -> para props v) dict)
 
         SUnion dict ->
-            props.sUnion dict (Dict.map (\_ v -> para props v) dict)
+            props.sUnion dict (Dict.map (\_ args -> List.map (para props) args) dict)
+
+        SDiscriminatedUnion du ->
+            props.sDiscriminatedUnion du (Dict.map (\_ v -> para props v) du.variants)
 
         SUnimplemented str ->
             props.sUnimplemented str
@@ -225,12 +256,18 @@ optPara attrs =
             , sIsoTime = Nothing
             , sIsoDate = Nothing
             , sDateTime = Nothing
+            , sLiteralString = \_ -> Nothing
+            , sLiteralInt = \_ -> Nothing
+            , sLiteralBool = \_ -> Nothing
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
+            , sSet = \_ _ -> Nothing
+            , sTuple = \_ _ -> Nothing
             , sRecord = \_ _ -> Nothing
             , sObject = \_ _ -> Nothing
             , sUnion = \_ _ -> Nothing
+            , sDiscriminatedUnion = \_ _ -> Nothing
             , sUnimplemented = \_ -> Nothing
             }
     in
@@ -328,6 +365,24 @@ onDateTime value base =
 
 
 {-| -}
+onLiteralString : (String -> Maybe a) -> Attr a
+onLiteralString fn base =
+    { base | sLiteralString = fn }
+
+
+{-| -}
+onLiteralInt : (Int -> Maybe a) -> Attr a
+onLiteralInt fn base =
+    { base | sLiteralInt = fn }
+
+
+{-| -}
+onLiteralBool : (Bool -> Maybe a) -> Attr a
+onLiteralBool fn base =
+    { base | sLiteralBool = fn }
+
+
+{-| -}
 onOptional : (Value -> Maybe a -> Maybe a) -> Attr a
 onOptional fn base =
     { base | sOptional = fn }
@@ -374,6 +429,18 @@ onArray fn base =
 
 
 {-| -}
+onTuple : (List Value -> List (Maybe a) -> Maybe a) -> Attr a
+onTuple fn base =
+    { base | sTuple = fn }
+
+
+{-| -}
+onSet : (Value -> Maybe a -> Maybe a) -> Attr a
+onSet fn base =
+    { base | sSet = fn }
+
+
+{-| -}
 onRecord : (Value -> Maybe a -> Maybe a) -> Attr a
 onRecord fn base =
     { base | sRecord = fn }
@@ -386,9 +453,15 @@ onObject fn base =
 
 
 {-| -}
-onUnion : (Dict String Value -> Dict String (Maybe a) -> Maybe a) -> Attr a
+onUnion : (Dict String (List Value) -> Dict String (List (Maybe a)) -> Maybe a) -> Attr a
 onUnion fn base =
     { base | sUnion = fn }
+
+
+{-| -}
+onDiscriminatedUnion : ({ discriminator : String, variants : Dict String Value } -> Dict String (Maybe a) -> Maybe a) -> Attr a
+onDiscriminatedUnion fn base =
+    { base | sDiscriminatedUnion = fn }
 
 
 {-| -}
@@ -517,14 +590,163 @@ decodeHelp =
                             D.map SArray <|
                                 D.field "element" decoder
 
+                        "set" ->
+                            D.map SSet <|
+                                D.at [ "def", "valueType" ] decoder
+
+                        "map" ->
+                            -- a JS Map over the wire is a JSON object, so a string-keyed map is
+                            -- exactly a record/Dict; non-string keys can't be JSON object keys
+                            D.andThen
+                                (\keyTypeType ->
+                                    if keyTypeType == "string" then
+                                        D.map SRecord <| D.at [ "def", "valueType" ] decoder
+
+                                    else
+                                        D.fail "Currently, only string-keyed maps are supported"
+                                )
+                                (D.at [ "def", "keyType", "type" ] D.string)
+
+                        "tuple" ->
+                            D.map STuple <|
+                                D.at [ "def", "items" ] (D.list decoder)
+
+                        -- `.default(...)` and `.catch(...)` are transparent wrappers: the wire
+                        -- value is just the inner type (the default/fallback is a zod-runtime
+                        -- concern Elm's decoder doesn't model), so we unwrap to the inner schema.
+                        "default" ->
+                            D.at [ "def", "innerType" ] decoder
+
+                        "catch" ->
+                            D.at [ "def", "innerType" ] decoder
+
                         "union" ->
-                            D.map (\options -> SUnion (Dict.fromList options)) <|
-                                D.field "options" <|
-                                    D.list
-                                        (D.map2 Tuple.pair
-                                            (D.oneOf [ D.field "format" D.string, D.field "type" D.string ])
-                                            decoder
+                            let
+                                -- each option is itself a schema; literal/enum options decode to `SUnion`,
+                                -- so a union of literals flattens cleanly into one variant dict.
+                                -- object/structural options are kept (positionally keyed) but are not yet
+                                -- code-generable — the Builder degrades those to the error module.
+                                optionToVariants : Int -> Value -> List ( String, List Value )
+                                optionToVariants i option =
+                                    case option of
+                                        SUnion variants ->
+                                            Dict.toList variants
+
+                                        other ->
+                                            [ ( "Variant" ++ String.fromInt i, [ other ] ) ]
+
+                                plainUnionDecoder =
+                                    D.map
+                                        (\options ->
+                                            SUnion <|
+                                                Dict.fromList <|
+                                                    List.concat <|
+                                                        List.indexedMap optionToVariants options
                                         )
+                                    <|
+                                        D.at [ "def", "options" ] (D.list decoder)
+
+                                -- a discriminated union pairs a discriminator field name with object options
+                                -- whose discriminant field is a single literal. We key each variant by its
+                                -- discriminant wire value and strip the discriminant from the payload.
+                                discriminatedUnionDecoder =
+                                    D.map2 Tuple.pair
+                                        (D.at [ "def", "discriminator" ] D.string)
+                                        (D.at [ "def", "options" ] (D.list decoder))
+                                        |> D.andThen
+                                            (\( discriminator, options ) ->
+                                                case extractDiscriminatedVariants discriminator options of
+                                                    Just variants ->
+                                                        D.succeed <|
+                                                            SDiscriminatedUnion
+                                                                { discriminator = discriminator
+                                                                , variants = variants
+                                                                }
+
+                                                    Nothing ->
+                                                        D.fail "union has a discriminator but options aren't discriminable objects"
+                                            )
+                            in
+                            -- guard: unsupported union shapes degrade to SUnimplemented rather than
+                            -- hard-failing the whole file's decode
+                            D.oneOf
+                                [ discriminatedUnionDecoder
+                                , plainUnionDecoder
+                                , D.succeed (SUnimplemented "union (unsupported shape)")
+                                ]
+
+                        "enum" ->
+                            let
+                                -- z.enum / string nativeEnum values are strings. numeric TS
+                                -- nativeEnums add reverse mappings, so entry values are a mix of
+                                -- ints (forward: name -> int) and strings (reverse: index -> name).
+                                -- Result Int String: Ok = int value, Err = string value.
+                                entryValue =
+                                    D.oneOf [ D.map Ok D.int, D.map Err D.string ]
+                            in
+                            D.map
+                                (\entries ->
+                                    let
+                                        entryList =
+                                            Dict.toList entries
+
+                                        forwardInts =
+                                            List.filterMap
+                                                (\( k, v ) ->
+                                                    case v of
+                                                        Ok i ->
+                                                            Just ( String.Ext.toTypename k, [ SLiteralInt i ] )
+
+                                                        Err _ ->
+                                                            Nothing
+                                                )
+                                                entryList
+                                    in
+                                    if List.isEmpty forwardInts then
+                                        -- string enum: constructor from the member name, wire from the value
+                                        SUnion <|
+                                            Dict.fromList <|
+                                                List.filterMap
+                                                    (\( k, v ) ->
+                                                        case v of
+                                                            Err s ->
+                                                                Just ( String.Ext.toTypename k, [ SLiteralString s ] )
+
+                                                            Ok _ ->
+                                                                Nothing
+                                                    )
+                                                    entryList
+
+                                    else
+                                        -- numeric enum: keep only the forward (name -> int) entries
+                                        SUnion (Dict.fromList forwardInts)
+                                )
+                                (D.at [ "def", "entries" ] (D.dict entryValue))
+
+                        "literal" ->
+                            let
+                                -- each literal value yields ( Elm constructor name, [ wire-valued leaf ] );
+                                -- the leaf preserves the original value so a matching decoder can be generated
+                                variantDecoder =
+                                    D.oneOf
+                                        [ D.map (\s -> ( String.Ext.toTypename s, [ SLiteralString s ] )) D.string
+                                        , D.map (\i -> ( String.Ext.toTypename (String.fromInt i), [ SLiteralInt i ] )) D.int
+                                        , D.map
+                                            (\v ->
+                                                if v then
+                                                    ( "LiteralTrue", [ SLiteralBool True ] )
+
+                                                else
+                                                    ( "LiteralFalse", [ SLiteralBool False ] )
+                                            )
+                                            D.bool
+                                        ]
+
+                                thisDcdr =
+                                    D.map (\variants -> SUnion <| Dict.fromList variants) <|
+                                        D.at [ "def", "values" ] (D.list variantDecoder)
+                            in
+                            thisDcdr
 
                         _ ->
                             -- eventually we may handle more of zod's types
@@ -533,3 +755,34 @@ decodeHelp =
                             D.succeed <| SUnimplemented type_
                 )
         ]
+
+
+{-| For a discriminated union, pair each object option with its discriminant wire value
+(read from the single-literal discriminator field) and strip that field from the payload.
+Returns Nothing if any option isn't a discriminable object, so the caller can degrade.
+-}
+extractDiscriminatedVariants : String -> List Value -> Maybe (Dict String Value)
+extractDiscriminatedVariants discriminator options =
+    let
+        toEntry : Value -> Maybe ( String, Value )
+        toEntry option =
+            case option of
+                SObject shape ->
+                    case Dict.get discriminator shape of
+                        Just (SUnion variants) ->
+                            case Dict.values variants of
+                                [ [ SLiteralString wire ] ] ->
+                                    Just ( wire, SObject (Dict.remove discriminator shape) )
+
+                                _ ->
+                                    Nothing
+
+                        _ ->
+                            Nothing
+
+                _ ->
+                    Nothing
+    in
+    options
+        |> List.foldr (\option acc -> Maybe.map2 (::) (toEntry option) acc) (Just [])
+        |> Maybe.map Dict.fromList
