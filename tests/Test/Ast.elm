@@ -105,6 +105,16 @@ suite =
                 -- z.string().default("x")
                 D.decodeString Ast.decoder """{"def":{"type":"default","innerType":{"def":{"type":"string"},"type":"string"}},"type":"default"}"""
                     |> Expect.equal (Ok SString)
+        , test "should decode a set as SSet of its element type" <|
+            \() ->
+                -- z.set(z.string())
+                D.decodeString Ast.decoder """{"def":{"type":"set","valueType":{"def":{"type":"string"},"type":"string"}},"type":"set"}"""
+                    |> Expect.equal (Ok (SSet SString))
+        , test "should decode a numeric nativeEnum (with TS reverse mappings) as an int-valued union" <|
+            \() ->
+                -- z.nativeEnum(enum { Red, Green }) — entries carry both forward and reverse mappings
+                D.decodeString Ast.decoder """{"def":{"type":"enum","entries":{"0":"Red","1":"Green","Red":0,"Green":1}},"type":"enum"}"""
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Green", [ SLiteralInt 1 ] ), ( "Red", [ SLiteralInt 0 ] ) ])))
         , test "should decode a discriminated union, keying variants by discriminant and stripping the tag from the payload" <|
             \() ->
                 -- z.discriminatedUnion("tag", [ z.object({ tag: z.literal("user"), x: z.string() }) ])

@@ -1,70 +1,35 @@
 {
-  "name": "@jmpavlick/typewriter",
-  "version": "0.0.3",
+  "name": "typewriter",
+  "version": "0.0.0",
+  "private": true,
   "description": "Generate Elm types and decoders from Zod schemas",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
-  "bin": {
-    "typewriter": "dist/index.js"
-  },
-  "files": [
-    "dist",
-    "templates"
-  ],
-  "publishConfig": {
-    "access": "public"
-  },
-  "scripts": {
-    "build": "tsc",
-    "dev": "pnpm typecheck; pnpm test:watch",
-    "test": "elm-test && pnpm test:ts",
-    "test:elm:watch": "elm-test --watch --no-clear-console",
-    "test:ts": "pnpm typecheck && tsx index.ts",
-    "test:ts:watch": "chokidar \"tsconfig.json\" \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
-    "test:watch": "concurrently \"pnpm test:elm:watch\" \"pnpm test:ts:watch\"",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "pnpm build"
-  },
-  "keywords": [
-    "elm",
-    "zod",
-    "typescript",
-    "codegen",
-    "elm-codegen",
-    "type-safety"
-  ],
   "author": "John Pavlick",
   "license": "ISC",
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/jmpavlick/typewriter.git"
-  },
-  "homepage": "https://github.com/jmpavlick/typewriter#readme",
-  "bugs": {
-    "url": "https://github.com/jmpavlick/typewriter/issues"
+  "scripts": {
+    "generate": "tsx index.ts",
+    "test": "elm-test && pnpm test:ts",
+    "test:ts": "pnpm typecheck && tsx index.ts",
+    "test:elm:watch": "elm-test --watch --no-clear-console",
+    "test:ts:watch": "chokidar \"tsconfig.json\" \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
+    "test:watch": "concurrently \"pnpm test:elm:watch\" \"pnpm test:ts:watch\"",
+    "typecheck": "tsc --noEmit"
   },
   "packageManager": "pnpm@10.10.0",
   "devDependencies": {
     "@types/node": "^25.1.0",
     "chokidar": "^5.0.0",
+    "chokidar-cli": "^3.0.0",
     "concurrently": "^9.2.1",
     "elm-test": "0.19.1-revision17",
     "elm-tooling": "^1.17.0",
     "prettier": "^3.8.1",
-    "tsx": "^4.21.0",
-    "zod": "^4.3.6"
+    "tsx": "^4.21.0"
   },
   "dependencies": {
-    "chokidar-cli": "^3.0.0",
-    "dedent": "^1.7.1",
     "elm": "0.19.1-6",
     "elm-codegen": "^0.6.3",
-    "neverthrow": "^8.2.0",
-    "safe-stable-stringify": "^2.5.0",
-    "typescript": "^5.9.3"
-  },
-  "peerDependencies": {
+    "typescript": "^5.9.3",
     "zod": "^4.3.6"
   }
 }

@@ -325,13 +325,35 @@ export const notification = z.object({
   ]),
 })
 
-// tuples
+// tuples (2 -> pair, 3 -> triple, 4+ -> right-nested pairs)
 export const pairTuple = z.tuple([z.string(), z.int()])
 export const tripleTuple = z.tuple([z.string(), z.int(), z.boolean()])
+export const quintTuple = z.tuple([z.string(), z.int(), z.boolean(), z.number(), z.string()])
 export const tupleInObject = z.object({
   coord: z.tuple([z.number(), z.number()]),
   labeled: z.tuple([z.string(), z.array(z.int())]),
 })
+
+// sets (comparable element types only)
+export const stringSet = z.set(z.string())
+export const intSet = z.set(z.int())
+export const setInObject = z.object({ tags: z.set(z.string()) })
+
+// maps (string-keyed -> Dict)
+export const stringMap = z.map(z.string(), z.int())
+
+// native enums
+enum ColorEnum {
+  Red,
+  Green,
+  Blue,
+}
+enum NameEnum {
+  A = "a",
+  B = "b",
+}
+export const numericNativeEnum = z.nativeEnum(ColorEnum)
+export const stringNativeEnum = z.nativeEnum(NameEnum)
 
 // transparent wrappers: .default() / .catch() unwrap to their inner type
 export const defaultedString = z.string().default("hello")

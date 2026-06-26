@@ -18,6 +18,7 @@ import Gen.Javascript
 import Gen.Json.Decode as GD
 import Gen.Json.Decode.Ext as GDE
 import Gen.Json.Encode as GE
+import Gen.Set
 import Gen.Time
 import Gen.Url
 import Gen.Url.Ext
@@ -76,6 +77,44 @@ build path ( moduleName, typedef ) =
 -- TYPE DECLARATIONS
 
 
+{-| `List (Maybe a) -> Maybe (List a)` — all-or-nothing: every element must be present -}
+sequenceMaybes : List (Maybe a) -> Maybe (List a)
+sequenceMaybes =
+    List.foldr (Maybe.map2 (::)) (Just [])
+
+
+{-| right-associate a list into nested pairs via `pair`: [a,b,c,d] -> pair a (pair b (pair c d)).
+A single element returns itself; an empty list has no pairing. -}
+rightNestPairs : (a -> a -> a) -> List a -> Maybe a
+rightNestPairs pair items =
+    case items of
+        [] ->
+            Nothing
+
+        [ x ] ->
+            Just x
+
+        x :: rest ->
+            Maybe.map (pair x) (rightNestPairs pair rest)
+
+
+{-| whether a value's type is usable as an Elm `Set` element / `comparable` -}
+isComparable : Ast.Value -> Bool
+isComparable value =
+    case value of
+        SString ->
+            True
+
+        SInt ->
+            True
+
+        SFloat ->
+            True
+
+        _ ->
+            False
+
+
 typeAnnotationAttrs : UnionTable -> List (Ast.Attr Type.Annotation)
 typeAnnotationAttrs table =
     [ -- leaves
@@ -100,16 +139,26 @@ typeAnnotationAttrs table =
     , Ast.onArray (always (Maybe.map Type.list))
     , Ast.onTuple
         (\_ items ->
-            case items of
-                [ Just a, Just b ] ->
-                    Just (Type.tuple a b)
+            sequenceMaybes items
+                |> Maybe.andThen
+                    (\anns ->
+                        case anns of
+                            [ a, b, c ] ->
+                                Just (Type.triple a b c)
 
-                [ Just a, Just b, Just c ] ->
-                    Just (Type.triple a b c)
+                            _ ->
+                                -- 2 -> ( a, b ); 4+ -> right-nested pairs ( a, ( b, ( c, d ) ) )
+                                rightNestPairs Type.tuple anns
+                    )
+        )
+    , Ast.onSet
+        (\inner ->
+            -- Elm `Set` requires comparable elements; non-comparable element types degrade
+            if isComparable inner then
+                Maybe.map Type.set
 
-                _ ->
-                    -- Elm only has 2- and 3-tuples; longer tuples degrade
-                    Nothing
+            else
+                always Nothing
         )
     , Ast.onRecord (always (Maybe.map <| Type.dict Type.string))
     , Ast.onObject
@@ -260,6 +309,9 @@ valueKey value =
         SArray inner ->
             "arr(" ++ valueKey inner ++ ")"
 
+        SSet inner ->
+            "set(" ++ valueKey inner ++ ")"
+
         STuple items ->
             "tup(" ++ (List.map valueKey items |> String.join ",") ++ ")"
 
@@ -364,6 +416,9 @@ collectUnions suggested value =
                 |> List.concatMap (\( k, v ) -> collectUnions (String.Ext.toTypename k) v)
 
         SArray inner ->
+            collectUnions suggested inner
+
+        SSet inner ->
             collectUnions suggested inner
 
         STuple items ->
@@ -706,15 +761,32 @@ decoderExprAttrs table =
     , Ast.onArray (\_ innerDecoder -> Maybe.map GD.list innerDecoder)
     , Ast.onTuple
         (\_ items ->
-            case items of
-                [ Just a, Just b ] ->
-                    Just (GD.map2 (\x y -> Elm.tuple x y) (GD.index 0 a) (GD.index 1 b))
+            sequenceMaybes items
+                |> Maybe.andThen
+                    (\decoders ->
+                        let
+                            -- read each tuple slot by position
+                            indexed =
+                                List.indexedMap (\i d -> GD.index i d) decoders
 
-                [ Just a, Just b, Just c ] ->
-                    Just (GD.map3 (\x y z -> Elm.triple x y z) (GD.index 0 a) (GD.index 1 b) (GD.index 2 c))
+                            pair d1 d2 =
+                                GD.map2 (\x y -> Elm.tuple x y) d1 d2
+                        in
+                        case indexed of
+                            [ a, b, c ] ->
+                                Just (GD.map3 (\x y z -> Elm.triple x y z) a b c)
 
-                _ ->
-                    Nothing
+                            _ ->
+                                rightNestPairs pair indexed
+                    )
+        )
+    , Ast.onSet
+        (\inner ->
+            if isComparable inner then
+                Maybe.map (\d -> GD.map (\listExpr -> Elm.apply Gen.Set.values_.fromList [ listExpr ]) (GD.list d))
+
+            else
+                always Nothing
         )
     , Ast.onRecord (\_ innerDecoder -> Maybe.map GD.dict innerDecoder)
     , Ast.onObject

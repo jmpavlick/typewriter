@@ -7,7 +7,7 @@ module Ast exposing
     , onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime
     , onUnimplemented
     , onOptional, onNullable
-    , onArray, onTuple, onRecord, onObject
+    , onArray, onTuple, onSet, onRecord, onObject
     , onUnion, onDiscriminatedUnion
     , onLiteralBool, onLiteralInt, onLiteralString, onNullableOrOptionalFlat, optPara, para
     )
@@ -88,6 +88,7 @@ type Value
     | SOptional Value
     | SNullable Value
     | SArray Value
+    | SSet Value
     | STuple (List Value)
     | SRecord Value
     | SObject (Dict String Value)
@@ -123,6 +124,7 @@ type alias Props a =
     , sOptional : Value -> a -> a
     , sNullable : Value -> a -> a
     , sArray : Value -> a -> a
+    , sSet : Value -> a -> a
     , sTuple : List Value -> List a -> a
     , sRecord : Value -> a -> a
     , sObject : Dict String Value -> Dict String a -> a
@@ -200,6 +202,9 @@ para props value =
         SArray inner ->
             props.sArray inner (para props inner)
 
+        SSet inner ->
+            props.sSet inner (para props inner)
+
         STuple items ->
             props.sTuple items (List.map (para props) items)
 
@@ -257,6 +262,7 @@ optPara attrs =
             , sOptional = \_ _ -> Nothing
             , sNullable = \_ _ -> Nothing
             , sArray = \_ _ -> Nothing
+            , sSet = \_ _ -> Nothing
             , sTuple = \_ _ -> Nothing
             , sRecord = \_ _ -> Nothing
             , sObject = \_ _ -> Nothing
@@ -429,6 +435,12 @@ onTuple fn base =
 
 
 {-| -}
+onSet : (Value -> Maybe a -> Maybe a) -> Attr a
+onSet fn base =
+    { base | sSet = fn }
+
+
+{-| -}
 onRecord : (Value -> Maybe a -> Maybe a) -> Attr a
 onRecord fn base =
     { base | sRecord = fn }
@@ -578,6 +590,23 @@ decodeHelp =
                             D.map SArray <|
                                 D.field "element" decoder
 
+                        "set" ->
+                            D.map SSet <|
+                                D.at [ "def", "valueType" ] decoder
+
+                        "map" ->
+                            -- a JS Map over the wire is a JSON object, so a string-keyed map is
+                            -- exactly a record/Dict; non-string keys can't be JSON object keys
+                            D.andThen
+                                (\keyTypeType ->
+                                    if keyTypeType == "string" then
+                                        D.map SRecord <| D.at [ "def", "valueType" ] decoder
+
+                                    else
+                                        D.fail "Currently, only string-keyed maps are supported"
+                                )
+                                (D.at [ "def", "keyType", "type" ] D.string)
+
                         "tuple" ->
                             D.map STuple <|
                                 D.at [ "def", "items" ] (D.list decoder)
@@ -647,9 +676,52 @@ decodeHelp =
                                 ]
 
                         "enum" ->
-                            D.map (\entryDict -> SUnion (Dict.fromList <| List.map (\( _, wire ) -> ( String.Ext.toTypename wire, [ SLiteralString wire ] )) <| Dict.toList entryDict)) <|
-                                D.at [ "def", "entries" ] <|
-                                    D.dict D.string
+                            let
+                                -- z.enum / string nativeEnum values are strings. numeric TS
+                                -- nativeEnums add reverse mappings, so entry values are a mix of
+                                -- ints (forward: name -> int) and strings (reverse: index -> name).
+                                -- Result Int String: Ok = int value, Err = string value.
+                                entryValue =
+                                    D.oneOf [ D.map Ok D.int, D.map Err D.string ]
+                            in
+                            D.map
+                                (\entries ->
+                                    let
+                                        entryList =
+                                            Dict.toList entries
+
+                                        forwardInts =
+                                            List.filterMap
+                                                (\( k, v ) ->
+                                                    case v of
+                                                        Ok i ->
+                                                            Just ( String.Ext.toTypename k, [ SLiteralInt i ] )
+
+                                                        Err _ ->
+                                                            Nothing
+                                                )
+                                                entryList
+                                    in
+                                    if List.isEmpty forwardInts then
+                                        -- string enum: constructor from the member name, wire from the value
+                                        SUnion <|
+                                            Dict.fromList <|
+                                                List.filterMap
+                                                    (\( k, v ) ->
+                                                        case v of
+                                                            Err s ->
+                                                                Just ( String.Ext.toTypename k, [ SLiteralString s ] )
+
+                                                            Ok _ ->
+                                                                Nothing
+                                                    )
+                                                    entryList
+
+                                    else
+                                        -- numeric enum: keep only the forward (name -> int) entries
+                                        SUnion (Dict.fromList forwardInts)
+                                )
+                                (D.at [ "def", "entries" ] (D.dict entryValue))
 
                         "literal" ->
                             let
