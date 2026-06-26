@@ -4,6 +4,7 @@ import Ast exposing (Value(..))
 import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
+import Elm.Case
 import Elm.Ext exposing (pipeline)
 import Gen.BigInt
 import Gen.BigInt.Ext
@@ -145,19 +146,97 @@ typeAnnotationAttrs =
 
 
 toTypeDecl : Ast.Value -> Result String Elm.Declaration
-toTypeDecl =
-    let
-        toTypeAnnotation : Ast.Value -> Result String Type.Annotation
-        toTypeAnnotation =
-            Result.fromMaybe "No type mapped for this AST value"
-                << Ast.optPara typeAnnotationAttrs
-    in
-    Result.map (Elm.alias "Value") << toTypeAnnotation
+toTypeDecl value =
+    case value of
+        -- a union at the root of a decl becomes a custom type named `Value`.
+        -- nested unions still fall through to `optPara` (and currently degrade to the
+        -- error module) — hoisting those to named top-level types is the next step.
+        SUnion variants ->
+            toUnitUnion variants
+                |> Result.map
+                    (\units ->
+                        Elm.customType "Value"
+                            (List.map (\u -> Elm.variant u.ctor) units)
+                    )
+
+        _ ->
+            value
+                |> Ast.optPara typeAnnotationAttrs
+                |> Result.fromMaybe "No type mapped for this AST value"
+                |> Result.map (Elm.alias "Value")
 
 
-toCustomTypeVariants : Maybe String -> Dict String Type.Annotation -> Maybe Type.Annotation
-toCustomTypeVariants =
-    Debug.todo ""
+
+-- UNIT-VARIANT UNIONS (z.literal / z.enum / z.union of literals)
+
+
+type WireValue
+    = WireString String
+    | WireInt Int
+    | WireBool Bool
+
+
+type alias UnitVariant =
+    { ctor : String, wire : WireValue }
+
+
+{-| Classify a union's variant dict as a set of unit (payload-free) variants, recovering
+the original wire value for each from the literal leaf preserved during AST decoding.
+Fails if any variant carries a structural payload (object/discriminated unions), which
+are not yet code-generable.
+-}
+toUnitUnion : Dict String (List Ast.Value) -> Result String (List UnitVariant)
+toUnitUnion variants =
+    variants
+        |> Dict.toList
+        |> List.map
+            (\( ctor, args ) ->
+                case args of
+                    [ SLiteralString s ] ->
+                        Ok { ctor = ctor, wire = WireString s }
+
+                    [ SLiteralInt i ] ->
+                        Ok { ctor = ctor, wire = WireInt i }
+
+                    [ SLiteralBool b ] ->
+                        Ok { ctor = ctor, wire = WireBool b }
+
+                    _ ->
+                        Err "Structural/object unions are not supported yet (only z.literal, z.enum, and unions of literals)"
+            )
+        |> List.foldr (Result.map2 (::)) (Ok [])
+
+
+{-| Build the decoder for a unit-variant union: match the wire value and emit the
+corresponding constructor. Only string-valued unions are supported so far.
+-}
+unitUnionDecoder : List UnitVariant -> Result String Elm.Expression
+unitUnionDecoder units =
+    units
+        |> List.map
+            (\u ->
+                case u.wire of
+                    WireString s ->
+                        Ok ( s, GD.succeed (Elm.val u.ctor) )
+
+                    _ ->
+                        Err "Only string-valued unit unions are supported so far (int/bool literal unions are a future step)"
+            )
+        |> List.foldr (Result.map2 (::)) (Ok [])
+        |> Result.map
+            (\cases ->
+                -- same "trust me bro" annotation hack as toObjectDecoder: elm-codegen otherwise
+                -- infers the decoder's type from the last constructor reference (e.g. `Decoder yellow`)
+                Elm.withType (Type.named [] "Json.Decode.Decoder Value") <|
+                    GD.andThen
+                        (\s ->
+                            Elm.Case.string s
+                                { cases = cases
+                                , otherwise = GD.fail "Unexpected value for this union"
+                                }
+                        )
+                        GD.string
+            )
 
 
 
@@ -211,14 +290,18 @@ decoderExprAttrs =
 
 
 toDecoderDecl : Ast.Value -> Result String Elm.Declaration
-toDecoderDecl =
-    let
-        toDecoderExpr : Ast.Value -> Result String Elm.Expression
-        toDecoderExpr =
-            Result.fromMaybe "Could not create a valid decoder for this type"
-                << Ast.optPara decoderExprAttrs
-    in
-    Result.map (Elm.declaration "decoder") << toDecoderExpr
+toDecoderDecl value =
+    case value of
+        SUnion variants ->
+            toUnitUnion variants
+                |> Result.andThen unitUnionDecoder
+                |> Result.map (Elm.declaration "decoder")
+
+        _ ->
+            value
+                |> Ast.optPara decoderExprAttrs
+                |> Result.fromMaybe "Could not create a valid decoder for this type"
+                |> Result.map (Elm.declaration "decoder")
 
 
 toObjectDecoder : List ( String, Elm.Expression ) -> Elm.Expression

@@ -1,6 +1,30 @@
 # Union Type Codegen Plan
 
-## Where We Are
+## Status — 2026-06-26 attempt (go/no-go)
+
+**GO** on unit-variant unions (`z.literal`, `z.enum`, and `z.union` of literals) **at the root of a decl**. Implemented end-to-end and verified: all 131 generated modules compile, 9 Elm tests pass. Error count dropped 4 → 2.
+
+What now works (previously in the error module):
+- `stringLiteral` → `type Value = StringLiteral` + decoder matching `"stringLiteral"`
+- `stringLiteralsAsEnum` → `type Value = Blue | Red | Yellow` + string-matching decoder
+
+What changed vs. the original plan's assumptions:
+- **The AST was *not* actually done.** The `enum`/`literal` decoders threw away the wire value (`"red"` → ctor `Red`, args `[]`), making a correct decoder impossible. Fix: each unit variant now carries its wire value as a single literal leaf in its args (`("Red", [SLiteralString "red"])`). No change to the `SUnion`/`Props`/`para` signatures — `onUnion` already receives the raw variant dict, so the wire value is readable there.
+- **There was no `"union"` decoder case at all** — `z.union`/`z.discriminatedUnion` fell through to `SUnimplemented`. Added one that flattens literal options into a single variant dict and degrades gracefully (`D.oneOf [..., D.succeed SUnimplemented]`) for shapes it can't handle, so a bad union never hard-fails the whole file's decode.
+- **Record dispatch bug** (separate from unions): `para` routed `SRecord` through `props.sArray` (`Ast.elm:200`), so `z.record(z.string(), V)` came out as `List V` instead of `Dict String V`. One-line fix; `recordInObject` now correctly emits `Dict.Dict String {...}`.
+
+The GenMonad / SymbolTable machinery in the plan below was **not** needed for this slice — root-level unions are a custom-type declaration handled directly in `toTypeDecl`/`toDecoderDecl`, no hoisting required.
+
+### NO-GO (the boundary — this is where GenMonad/SymbolTable is actually required)
+- **Nested unions** (`user.permissions.group`): a union inside an object still needs to be hoisted to a named top-level type and referenced by name. `optPara` returns a single annotation and can't emit a side-declaration, so a nested union makes its whole enclosing object fail → `user` stays in the error module. **This is the writer-monad accumulator work.**
+- **Structural / object / discriminated unions** (`systemUser`): `toUnitUnion` rejects any variant with a non-literal payload. Also note the test schema writes discriminants as raw strings (`z.object({ tag: "user", ... })`) which Zod v4 does *not* wrap as `z.literal`, so the object shape decode fails — `astify.ts`/the discriminator threading needs work here too.
+- **int/bool-valued unit unions**: classifier accepts them into the *type* but `unitUnionDecoder` only builds string-matching decoders so far (`Elm.Case.string`); int needs if-chains or `Elm.Case.custom`, bool an `ifThen`.
+
+Touched: `src/Ast.elm` (record fix, wire-preserving enum/literal decoders, new union case), `src/Builder.elm` (root-union codegen: `toUnitUnion`, `unitUnionDecoder`, rewritten `toTypeDecl`/`toDecoderDecl`), `tests/Test/Ast.elm` (updated 4 expectations).
+
+---
+
+## Where We Are (original plan, pre-attempt)
 
 The AST (`src/Ast.elm`) now fully represents union types:
 

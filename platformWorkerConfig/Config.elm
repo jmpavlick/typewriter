@@ -1,5 +1,6 @@
 module Config exposing (..)
 
+import Dict
 import Json.Decode
 import Json.Decode.Ext
 
@@ -16,7 +17,7 @@ type alias Value =
     , relativeGlobalPrepareScriptPath : Maybe String
     , root : String
     , sections :
-        List { cleanFirst : Maybe Bool
+        Dict.Dict String { cleanFirst : Maybe Bool
         , debug : Maybe Bool
         , elmCodegenOverrides : Maybe { generatorModulePath : Maybe String }
         , outputModuleNamespace : Maybe (List String)
@@ -95,7 +96,7 @@ decoder =
                                                             ) |> Json.Decode.Ext.andMap
                                                                          (Json.Decode.field
                                                                                   "sections"
-                                                                                  (Json.Decode.list
+                                                                                  (Json.Decode.dict
                                                                                            (Json.Decode.succeed
                                                                                                     (\cleanFirst debug elmCodegenOverrides outputModuleNamespace relativeInputPaths relativeOutdir relativePrepareScriptPath ->
                                                                                                              { cleanFirst =

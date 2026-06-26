@@ -74,8 +74,8 @@ suite =
                         (Ok
                             (SUnion
                                 (Dict.fromList
-                                    [ ( "A", [] )
-                                    , ( "B", [] )
+                                    [ ( "A", [ SLiteralString "a" ] )
+                                    , ( "B", [ SLiteralString "b" ] )
                                     ]
                                 )
                             )
@@ -84,15 +84,15 @@ suite =
             \() ->
                 -- z.literal("hello")
                 D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello"]},"type":"literal","values":{}}"""
-                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [] ) ])))
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [ SLiteralString "hello" ] ) ])))
         , test "should decode a list of string literals" <|
             \() ->
                 -- z.literal(["hello", "world"])
                 D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello","world"]},"type":"literal","values":{}}"""
-                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [] ), ( "World", [] ) ])))
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [ SLiteralString "hello" ] ), ( "World", [ SLiteralString "world" ] ) ])))
         , test "should decode a list of mixed literals" <|
             \() ->
                 -- z.literal(["hello", false, true, 232])
                 D.decodeString Ast.decoder """{"def":{"type":"literal","values":["hello",false,true,232]},"type":"literal","values":{}}"""
-                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [] ), ( "LiteralFalse", [] ), ( "LiteralTrue", [] ), ( "Int_232", [] ) ])))
+                    |> Expect.equal (Ok (SUnion (Dict.fromList [ ( "Hello", [ SLiteralString "hello" ] ), ( "LiteralFalse", [ SLiteralBool False ] ), ( "LiteralTrue", [ SLiteralBool True ] ), ( "Int_232", [ SLiteralInt 232 ] ) ])))
         ]

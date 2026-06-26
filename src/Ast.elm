@@ -197,7 +197,7 @@ para props value =
             props.sArray inner (para props inner)
 
         SRecord inner ->
-            props.sArray inner (para props inner)
+            props.sRecord inner (para props inner)
 
         SObject dict ->
             props.sObject dict (Dict.map (\_ v -> para props v) dict)
@@ -554,31 +554,67 @@ decodeHelp =
                             D.map SArray <|
                                 D.field "element" decoder
 
+                        "union" ->
+                            let
+                                -- each option is itself a schema; literal/enum options decode to `SUnion`,
+                                -- so a union of literals flattens cleanly into one variant dict.
+                                -- object/structural options are kept (positionally keyed) but are not yet
+                                -- code-generable — the Builder degrades those to the error module.
+                                optionToVariants : Int -> Value -> List ( String, List Value )
+                                optionToVariants i option =
+                                    case option of
+                                        SUnion variants ->
+                                            Dict.toList variants
+
+                                        other ->
+                                            [ ( "Variant" ++ String.fromInt i, [ other ] ) ]
+
+                                unionDecoder =
+                                    D.map
+                                        (\options ->
+                                            SUnion <|
+                                                Dict.fromList <|
+                                                    List.concat <|
+                                                        List.indexedMap optionToVariants options
+                                        )
+                                    <|
+                                        D.at [ "def", "options" ] (D.list decoder)
+                            in
+                            -- guard: malformed or unsupported union shapes (e.g. discriminated unions whose
+                            -- discriminant fields are raw literals zod doesn't wrap) degrade rather than
+                            -- hard-failing the whole file's decode
+                            D.oneOf
+                                [ unionDecoder
+                                , D.succeed (SUnimplemented "union (unsupported shape)")
+                                ]
+
                         "enum" ->
-                            D.map (\entryDict -> SUnion (Dict.fromList <| List.map (\( k, _ ) -> ( String.Ext.toTypename k, [] )) <| Dict.toList entryDict)) <|
+                            D.map (\entryDict -> SUnion (Dict.fromList <| List.map (\( _, wire ) -> ( String.Ext.toTypename wire, [ SLiteralString wire ] )) <| Dict.toList entryDict)) <|
                                 D.at [ "def", "entries" ] <|
                                     D.dict D.string
 
                         "literal" ->
                             let
-                                variantNameDecoder =
+                                -- each literal value yields ( Elm constructor name, [ wire-valued leaf ] );
+                                -- the leaf preserves the original value so a matching decoder can be generated
+                                variantDecoder =
                                     D.oneOf
-                                        [ D.map String.Ext.toTypename D.string
-                                        , D.map (String.Ext.toTypename << String.fromInt) D.int
+                                        [ D.map (\s -> ( String.Ext.toTypename s, [ SLiteralString s ] )) D.string
+                                        , D.map (\i -> ( String.Ext.toTypename (String.fromInt i), [ SLiteralInt i ] )) D.int
                                         , D.map
                                             (\v ->
                                                 if v then
-                                                    "LiteralTrue"
+                                                    ( "LiteralTrue", [ SLiteralBool True ] )
 
                                                 else
-                                                    "LiteralFalse"
+                                                    ( "LiteralFalse", [ SLiteralBool False ] )
                                             )
                                             D.bool
                                         ]
 
                                 thisDcdr =
-                                    D.map (\typenames -> SUnion <| Dict.fromList <| List.map (\t -> ( t, [] )) typenames) <|
-                                        D.at [ "def", "values" ] (D.list variantNameDecoder)
+                                    D.map (\variants -> SUnion <| Dict.fromList variants) <|
+                                        D.at [ "def", "values" ] (D.list variantDecoder)
                             in
                             thisDcdr
 
