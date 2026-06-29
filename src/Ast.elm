@@ -554,10 +554,14 @@ decodeHelp =
                                 |> D.andThen
                                     (\str ->
                                         if str == "optional" then
+                                            -- `.optional().nonoptional()` cancels out: skip both wrappers
                                             D.at [ "def", "innerType", "def", "innerType" ] decoder
 
                                         else
-                                            D.fail "Did not expect a `nonoptional` without an `optional` immediately inside"
+                                            -- a standalone `.nonoptional()` only asserts presence; the
+                                            -- wire type is its inner type, so unwrap transparently (as
+                                            -- default/nullable/optional do above)
+                                            D.at [ "def", "innerType" ] decoder
                                     )
 
                         "optional" ->
