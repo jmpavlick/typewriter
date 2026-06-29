@@ -7,7 +7,7 @@ import * as ElmCodegen from "../lib/elmCodegen.js"
 // independent of the caller's `root`. derive it from this module's location so
 // external configs — which root their *inputs* elsewhere (e.g. another repo's
 // schemas) — still find the generator. `src/config.ts` → `..` is the package root.
-const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
+export const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
 /** this defines a single configuration section; at least one is required for the program to do anything meaningful
  */

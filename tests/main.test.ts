@@ -2,7 +2,7 @@ import { test } from "node:test"
 import assert from "node:assert/strict"
 import * as path from "path"
 import { fileURLToPath } from "url"
-import { type ConfigParams, toConfig } from "../src/config.js"
+import { type ConfigParams, packageRoot, toConfig } from "../src/config.js"
 import { toRunPropsEntries } from "../src/main.js"
 import ouroboros from "../src/ouroboros.js"
 
@@ -87,4 +87,22 @@ test("ouroboros stays a valid config that plans its own self-codegen sections", 
     entries.map((e) => e.label).sort(),
     ["main", "tests"],
   )
+})
+
+test("ouroboros plans absolute, package-rooted paths so runAll is cwd-independent", () => {
+  // a consumer launches runAll from THEIR repo root; ouroboros (always first) must
+  // still resolve its own inputs and write its outputs under typewriter's package
+  // dir — never scattering self-codegen into the caller's tree.
+  for (const e of toRunPropsEntries(ouroboros)) {
+    assert.ok(path.isAbsolute(e.inputPath), `input absolute: ${e.inputPath}`)
+    assert.ok(e.inputPath.startsWith(packageRoot), `input under packageRoot: ${e.inputPath}`)
+    assert.ok(
+      path.isAbsolute(e.elmCodegenConfig.outdir),
+      `outdir absolute: ${e.elmCodegenConfig.outdir}`,
+    )
+    assert.ok(
+      e.elmCodegenConfig.outdir.startsWith(packageRoot),
+      `outdir under packageRoot: ${e.elmCodegenConfig.outdir}`,
+    )
+  }
 })
