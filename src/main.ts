@@ -3,6 +3,8 @@ import z from "zod"
 import path from "path"
 import * as Astify from "./astify.js"
 import * as fs from "../lib/fs.js"
+import { type Config } from "./config.js"
+import ouroboros from "./ouroboros.js"
 
 /** the module the Elm codegen emits when one or more schemas can't be fully generated */
 const ERROR_MODULE_NAME = "AaaaaaaaaErrors"
@@ -63,4 +65,74 @@ export const run = async ({
   await fs.rm(namespaceOutdir, { recursive: true, force: true })
   await ElmCodegen.execute(elmCodegenConfig)({ outputModuleNamespace, decls })
   await assertNoErrorModule(errorModulePath, label)
+}
+
+/** flatten a `Config` into one `RunProps` per (section × input path). pure — no IO.
+ * `root` is resolved to an absolute path here so inputs resolve the same regardless
+ * of the caller's cwd; outputs (per-section `relativeOutdir`) stay relative to the
+ * launch dir, which is how callers land generated code wherever they want. */
+export const toRunPropsEntries = ({
+  root,
+  elmCodegenConfig: globalElmCodegenConfig,
+  sections,
+  workdirPath,
+}: Config): RunProps[] => {
+  const absoluteRoot = path.resolve(root)
+
+  const fromSection = ([
+    label,
+    {
+      relativeInputPaths,
+      relativeOutdir,
+      cleanFirst,
+      debug,
+      elmCodegenOverrides,
+      outputModuleNamespace,
+    },
+  ]: [string, Config["sections"][number]]): RunProps[] => {
+    const elmCodegenConfig: ElmCodegen.Config = {
+      ...globalElmCodegenConfig,
+      outdir: relativeOutdir,
+      ...(cleanFirst === undefined ? {} : { cleanFirst }),
+      ...(debug === undefined ? {} : { debug }),
+      ...{ ...elmCodegenOverrides },
+    }
+
+    return relativeInputPaths.map((rip) => {
+      const inputPath = path.join(absoluteRoot, rip)
+      const relativeWithoutExt = rip.replace(/\.[^.]+$/, "")
+      const debugZodAstOutputPath = path.join(workdirPath, `${relativeWithoutExt}.json`)
+
+      return {
+        label,
+        inputPath,
+        outputModuleNamespace: outputModuleNamespace ?? [],
+        elmCodegenConfig,
+        debugZodAstOutputPath,
+      }
+    })
+  }
+
+  return Array.from(Object.entries(sections)).flatMap(fromSection)
+}
+
+/** run every section of one config concurrently, collecting ALL failures (so one
+ * bad section doesn't hide the others). throws an `AggregateError` if any failed. */
+const runEntries = async (entries: RunProps[]): Promise<void> => {
+  const outcomes = await Promise.allSettled(entries.map(run))
+  const failures = outcomes.flatMap((o) => (o.status === "rejected" ? [o.reason] : []))
+  if (failures.length > 0) {
+    throw new AggregateError(failures, `typewriter: ${failures.length} section(s) failed`)
+  }
+}
+
+/** the full pipeline. ouroboros (typewriter generating its OWN Elm bindings) ALWAYS
+ * runs first, to completion — the generator compiles against those bindings, so a
+ * caller config must never race it — then each passed-in config runs in order.
+ * throws an `AggregateError` on any section failure; the CLI (index.ts) turns that
+ * into a non-zero exit. */
+export const runAll = async (...configs: Config[]): Promise<void> => {
+  for (const config of [ouroboros, ...configs]) {
+    await runEntries(toRunPropsEntries(config))
+  }
 }

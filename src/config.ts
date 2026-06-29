@@ -1,6 +1,13 @@
 import z from "zod"
 import * as path from "path"
+import { fileURLToPath } from "url"
 import * as ElmCodegen from "../lib/elmCodegen.js"
+
+// typewriter's own Elm generator project (codegen/) lives beside this package,
+// independent of the caller's `root`. derive it from this module's location so
+// external configs — which root their *inputs* elsewhere (e.g. another repo's
+// schemas) — still find the generator. `src/config.ts` → `..` is the package root.
+const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
 /** this defines a single configuration section; at least one is required for the program to do anything meaningful
  */
@@ -45,7 +52,7 @@ export const toConfig = ({
   const elmCodegenConfig: ElmCodegen.Config = {
     cleanFirst: false,
     debug: false,
-    cwd: path.join(root, "codegen"),
+    cwd: path.join(packageRoot, "codegen"),
     generatorModulePath: "GenerateZodBindings.elm",
     outdir: "generated",
   }

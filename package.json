@@ -8,7 +8,8 @@
   "license": "ISC",
   "scripts": {
     "generate": "tsx index.ts",
-    "test": "elm-test && pnpm test:ts",
+    "test": "pnpm test:unit && elm-test && pnpm test:ts",
+    "test:unit": "node --import tsx --test \"tests/**/*.test.ts\"",
     "test:ts": "pnpm typecheck && tsx index.ts",
     "test:elm:watch": "elm-test --watch --no-clear-console",
     "test:ts:watch": "chokidar \"tsconfig.json\" \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
