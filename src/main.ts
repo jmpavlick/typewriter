@@ -1,6 +1,7 @@
 import * as ElmCodegen from "../lib/elmCodegen.js"
 import z from "zod"
 import path from "path"
+import { inspect } from "util"
 import * as Astify from "./astify.js"
 import * as fs from "../lib/fs.js"
 import { type Config } from "./config.js"
@@ -54,7 +55,10 @@ export const run = async ({
   const decls = await Astify.execute(inputPath)
 
   if (elmCodegenConfig.debug) {
-    await fs.writeFileUtf8(debugZodAstOutputPath, JSON.stringify(decls, null, 2), {
+    // decls are live Zod schema instances; their object graph is cyclic (zod's internal
+    // back-refs + shared/recursive sub-schemas pulled from other schemas), so JSON.stringify
+    // throws. util.inspect walks the same graph and renders cycles as [Circular] instead.
+    await fs.writeFileUtf8(debugZodAstOutputPath, inspect(decls, { depth: null }), {
       overwrite: true,
       mkdirP: true,
     })
