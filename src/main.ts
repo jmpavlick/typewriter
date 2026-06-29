@@ -1,11 +1,35 @@
 import * as ElmCodegen from "../lib/elmCodegen.js"
 import z from "zod"
 import path from "path"
-import { inspect } from "util"
 import * as Astify from "./astify.js"
 import * as fs from "../lib/fs.js"
 import { type Config } from "./config.js"
 import ouroboros from "./ouroboros.js"
+
+/**
+ * Astify hands back live Zod schema instances. Consumers may decorate those instances
+ * with non-structural metadata (e.g. a back-reference to a parent object) that forms a
+ * cycle — which makes both our debug dump and elm-codegen's flag serialization throw.
+ * Flatten to a plain, acyclic value: drop a node only when it reappears on its OWN path
+ * (a genuine cycle), never when it's merely shared (a DAG), so every structural field the
+ * Elm decoder reads is preserved. The decoder ignores the surviving decoration fields.
+ */
+export const toSerializable = (decls: unknown): unknown => {
+  const ancestors: { holder: unknown; value: object }[] = []
+  return JSON.parse(
+    JSON.stringify(decls, function (this: unknown, _key: string, value: unknown) {
+      if (value !== null && typeof value === "object") {
+        // unwind ancestors that aren't the current holder, then detect a back-edge
+        while (ancestors.length > 0 && ancestors[ancestors.length - 1].value !== this) {
+          ancestors.pop()
+        }
+        if (ancestors.some((a) => a.value === value)) return undefined
+        ancestors.push({ holder: this, value: value as object })
+      }
+      return value
+    }),
+  )
+}
 
 /** the module the Elm codegen emits when one or more schemas can't be fully generated */
 const ERROR_MODULE_NAME = "AaaaaaaaaErrors"
@@ -53,12 +77,14 @@ export const run = async ({
   console.log(`section: ${label}\ninput: ${inputPath}`)
 
   const decls = await Astify.execute(inputPath)
+  // flatten the live Zod instances to a plain, acyclic value: elm-codegen serializes the
+  // flags it hands to the Elm generator, and consumer-attached cyclic decorations (e.g.
+  // shepherd's `.topic`) would otherwise make that throw. the Elm decoder reads only the
+  // structural fields, all of which survive this.
+  const serializableDecls = toSerializable(decls)
 
   if (elmCodegenConfig.debug) {
-    // decls are live Zod schema instances; their object graph is cyclic (zod's internal
-    // back-refs + shared/recursive sub-schemas pulled from other schemas), so JSON.stringify
-    // throws. util.inspect walks the same graph and renders cycles as [Circular] instead.
-    await fs.writeFileUtf8(debugZodAstOutputPath, inspect(decls, { depth: null }), {
+    await fs.writeFileUtf8(debugZodAstOutputPath, JSON.stringify(serializableDecls, null, 2), {
       overwrite: true,
       mkdirP: true,
     })
@@ -67,7 +93,7 @@ export const run = async ({
   // wipe this section's output dir first so deleted schemas don't leave stale modules (and the
   // post-run check only sees this run's output)
   await fs.rm(namespaceOutdir, { recursive: true, force: true })
-  await ElmCodegen.execute(elmCodegenConfig)({ outputModuleNamespace, decls })
+  await ElmCodegen.execute(elmCodegenConfig)({ outputModuleNamespace, decls: serializableDecls })
   await assertNoErrorModule(errorModulePath, label)
 }
 

@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import * as path from "path"
 import { fileURLToPath } from "url"
 import { type ConfigParams, packageRoot, toConfig } from "../src/config.js"
-import { toRunPropsEntries } from "../src/main.js"
+import { toRunPropsEntries, toSerializable } from "../src/main.js"
 import ouroboros from "../src/ouroboros.js"
 
 // the package root, derived the same way config.ts derives it — tests/ → ..
@@ -87,6 +87,23 @@ test("ouroboros stays a valid config that plans its own self-codegen sections", 
     entries.map((e) => e.label).sort(),
     ["main", "tests"],
   )
+})
+
+test("toSerializable drops true cycles but keeps shared (DAG) references and all fields", () => {
+  const shared: Record<string, unknown> = { v: 1 }
+  const root: Record<string, unknown> = { type: "object", a: shared, b: shared }
+  root.self = root // direct cycle
+  shared.parent = root // cycle through a shared node
+
+  // would throw under plain JSON.stringify; must not here
+  const out = toSerializable(root) as Record<string, any>
+
+  assert.equal(out.type, "object") // structural field preserved
+  assert.equal(out.self, undefined) // back-edge dropped
+  // the shared node survives in BOTH positions (DAG kept, not collapsed/dropped)
+  assert.deepEqual(out.a, { v: 1 })
+  assert.deepEqual(out.b, { v: 1 })
+  assert.equal(out.a.parent, undefined) // only its cyclic back-edge is gone
 })
 
 test("ouroboros plans absolute, package-rooted paths so runAll is cwd-independent", () => {
