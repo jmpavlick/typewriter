@@ -15,9 +15,19 @@ toValidIdentifier s =
         toValidIdentifierBase Char.toLower s
 
 
+{-| `camelize` collapses [-_ whitespace] into word boundaries but leaves other punctuation
+(e.g. the apostrophe in "New Year's Day") intact, which is illegal in an Elm identifier.
+Drop anything that isn't a valid identifier char. The decoder matches the original wire
+value, so only the constructor *name* is sanitized — never the data.
+-}
+stripInvalidChars : String -> String
+stripInvalidChars =
+    String.filter (\c -> Char.isAlphaNum c || c == '_')
+
+
 toValidIdentifierBase : (Char -> Char) -> String -> Maybe String
 toValidIdentifierBase caseFn s =
-    case String.uncons <| String.Extra.camelize s of
+    case String.uncons <| stripInvalidChars <| String.Extra.camelize s of
         Nothing ->
             Nothing
 
