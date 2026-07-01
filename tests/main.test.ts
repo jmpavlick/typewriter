@@ -43,17 +43,14 @@ test("toRunPropsEntries emits one RunProps per (section × input path)", () => {
   assert.equal(entries.length, 2)
   assert.deepEqual(
     entries.map((e) => e.label),
-    ["models", "models"],
+    ["models", "models"]
   )
   // root is resolved to absolute; outputs stay as the caller's relativeOutdir
   assert.equal(entries[0].inputPath, path.join("/app", "a/schemas.ts"))
   assert.equal(entries[1].inputPath, path.join("/app", "b/schemas.ts"))
   assert.equal(entries[0].elmCodegenConfig.outdir, "out/elm")
   assert.deepEqual(entries[0].outputModuleNamespace, ["Api", "Gen"])
-  assert.equal(
-    entries[0].debugZodAstOutputPath,
-    path.join("/app", ".typewriter", "a/schemas.json"),
-  )
+  assert.equal(entries[0].debugZodAstOutputPath, path.join("/app", ".typewriter", "a/schemas.json"))
 })
 
 test("toRunPropsEntries defaults an absent outputModuleNamespace to []", () => {
@@ -61,7 +58,7 @@ test("toRunPropsEntries defaults an absent outputModuleNamespace to []", () => {
     toConfig({
       root: ".",
       sections: { s: { relativeInputPaths: ["x.ts"], relativeOutdir: "o" } },
-    }),
+    })
   )
   assert.deepEqual(entries[0].outputModuleNamespace, [])
 })
@@ -73,7 +70,7 @@ test("toRunPropsEntries threads cleanFirst/debug overrides into elmCodegenConfig
       sections: {
         s: { relativeInputPaths: ["x.ts"], relativeOutdir: "o", cleanFirst: true, debug: true },
       },
-    }),
+    })
   )
   assert.equal(entries[0].elmCodegenConfig.cleanFirst, true)
   assert.equal(entries[0].elmCodegenConfig.debug, true)
@@ -83,10 +80,7 @@ test("ouroboros stays a valid config that plans its own self-codegen sections", 
   // runAll always runs ouroboros first; this guards that ouroboros keeps planning
   // cleanly (one entry per section) so that contract can't silently rot.
   const entries = toRunPropsEntries(ouroboros)
-  assert.deepEqual(
-    entries.map((e) => e.label).sort(),
-    ["main", "tests"],
-  )
+  assert.deepEqual(entries.map((e) => e.label).sort(), ["main", "tests"])
 })
 
 test("toSerializable drops true cycles but keeps shared (DAG) references and all fields", () => {
@@ -115,11 +109,11 @@ test("ouroboros plans absolute, package-rooted paths so runAll is cwd-independen
     assert.ok(e.inputPath.startsWith(packageRoot), `input under packageRoot: ${e.inputPath}`)
     assert.ok(
       path.isAbsolute(e.elmCodegenConfig.outdir),
-      `outdir absolute: ${e.elmCodegenConfig.outdir}`,
+      `outdir absolute: ${e.elmCodegenConfig.outdir}`
     )
     assert.ok(
       e.elmCodegenConfig.outdir.startsWith(packageRoot),
-      `outdir under packageRoot: ${e.elmCodegenConfig.outdir}`,
+      `outdir under packageRoot: ${e.elmCodegenConfig.outdir}`
     )
   }
 })
