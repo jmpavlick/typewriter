@@ -18,6 +18,7 @@ import Gen.Javascript
 import Gen.Json.Decode as GD
 import Gen.Json.Decode.Ext as GDE
 import Gen.Json.Encode as GE
+import Gen.Maybe
 import Gen.Set
 import Gen.Time
 import Gen.Url
@@ -790,13 +791,15 @@ decoderExprAttrs table =
         )
     , Ast.onRecord (\_ innerDecoder -> Maybe.map GD.dict innerDecoder)
     , Ast.onObject
-        (\_ dictOfMaybeDecoders ->
+        (\rawFields dictOfMaybeDecoders ->
             dictOfMaybeDecoders
                 |> Dict.toList
                 |> List.foldr
                     (\( fieldName, maybeDecoder ) acc ->
                         Maybe.map2
-                            (\decoder rest -> ( fieldName, decoder ) :: rest)
+                            (\decoder rest ->
+                                ( fieldName, fieldKeyIsOptional fieldName rawFields, decoder ) :: rest
+                            )
                             maybeDecoder
                             acc
                     )
@@ -840,13 +843,41 @@ toDecoderDecl table value =
                 |> Result.map (Elm.declaration "decoder")
 
 
-toObjectDecoder : List ( String, Elm.Expression ) -> Elm.Expression
+{-| is this object field's KEY allowed to be absent? true iff its AST node is `SOptional`
+(z's `.optional()`). a `SNullable` (`.nullable()`) field's key must be present but its value
+may be null, so it is NOT optional here. the distinction is invisible once the field's value
+decoder is built, so we read it straight off the raw AST the paramorphism hands us.
+-}
+fieldKeyIsOptional : String -> Dict String Value -> Bool
+fieldKeyIsOptional name rawFields =
+    case Dict.get name rawFields of
+        Just (SOptional _) ->
+            True
+
+        _ ->
+            False
+
+
+{-| `D.oneOf [ D.field name valueDecoder, D.succeed Nothing ]` — for an OPTIONAL key: an absent
+key yields `Nothing`, a present key runs the value decoder (which already tolerates a null value,
+being `oneOf [ maybe, nullable ]`). without this a `.optional()` field compiled to a bare
+`D.field`, which DEMANDS the key and so failed to decode whenever the key was simply missing.
+-}
+optionalKeyField : String -> Elm.Expression -> Elm.Expression
+optionalKeyField name valueDecoder =
+    GD.oneOf
+        [ GD.field name valueDecoder
+        , GD.succeed Gen.Maybe.make_.nothing
+        ]
+
+
+toObjectDecoder : List ( String, Bool, Elm.Expression ) -> Elm.Expression
 toObjectDecoder fields =
     let
         -- Argument specs for the constructor: [("field1", Nothing), ("field2", Nothing)]
         argSpecs : List ( String, Maybe Type.Annotation )
         argSpecs =
-            List.map (\( name, _ ) -> ( name, Nothing )) fields
+            List.map (\( name, _, _ ) -> ( name, Nothing )) fields
 
         -- Build the record constructor: \field1 field2 -> { field1 = field1, field2 = field2 }
         ctor : Elm.Expression
@@ -855,18 +886,23 @@ toObjectDecoder fields =
                 (\argExprs ->
                     Elm.record
                         (List.map2
-                            (\( name, _ ) expr -> ( name, expr ))
+                            (\( name, _, _ ) expr -> ( name, expr ))
                             fields
                             argExprs
                         )
                 )
 
-        -- Build field decoders: [Dx.andMap (D.field "field1" decoder1), ...]
+        -- Build field decoders: [Dx.andMap (D.field "field1" decoder1), ...]. an optional key is
+        -- read through `optionalKeyField` so an absent key decodes to `Nothing` instead of failing.
         fieldDecoders : List (Elm.Expression -> Elm.Expression)
         fieldDecoders =
             List.map
-                (\( name, decoder ) ->
-                    GDE.andMap (GD.field name decoder)
+                (\( name, keyOptional, decoder ) ->
+                    if keyOptional then
+                        GDE.andMap (optionalKeyField name decoder)
+
+                    else
+                        GDE.andMap (GD.field name decoder)
                 )
                 fields
     in

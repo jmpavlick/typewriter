@@ -1,11 +1,14 @@
 #!/usr/bin/env node
 import { runAll } from "./src/main.js"
+import ouroboros from "./src/ouroboros.js"
 
-// typewriter generating its own bindings: runAll always runs ouroboros first, and
-// here we pass no extra configs. callers that want to generate from their own
-// schemas import { runAll } and pass their config(s) — see src/main.ts.
+// typewriter generating its own bindings: the CLI is the ouroboros path — it
+// regenerates typewriter's own Elm bindings (platformWorkerConfig/, generated/).
+// callers that want to generate from their own schemas import { runAll } and pass
+// their config(s); runAll no longer self-gens, so consumer runs never write inside
+// this package — see src/main.ts.
 try {
-  await runAll()
+  await runAll(ouroboros)
 } catch (err) {
   // runAll throws AggregateError when one or more sections fail; surface each, then
   // exit non-zero so the failure can't pass silently.

@@ -73,15 +73,18 @@ decoder =
                                                                                                                             )
                               )
                      ) |> Json.Decode.Ext.andMap
-                                  (Json.Decode.field
-                                           "relativeGlobalPrepareScriptPath"
-                                           (Json.Decode.oneOf
-                                                    [ Json.Decode.maybe
+                                  (Json.Decode.oneOf
+                                           [ Json.Decode.field
+                                               "relativeGlobalPrepareScriptPath"
+                                               (Json.Decode.oneOf
+                                                  [ Json.Decode.maybe
                                                         Json.Decode.string
-                                                    , Json.Decode.nullable
+                                                  , Json.Decode.nullable
                                                         Json.Decode.string
-                                                    ]
-                                           )
+                                                  ]
+                                               )
+                                           , Json.Decode.succeed Nothing
+                                           ]
                                   ) |> Json.Decode.Ext.andMap
                                                (Json.Decode.field
                                                         "root"
@@ -108,81 +111,105 @@ decoder =
                                                                                                     relativePrepareScriptPath
                                                                                                 }
                                                                                        ) |> Json.Decode.Ext.andMap
-                                                                                                        (Json.Decode.field
-                                                                                                                     "cleanFirst"
-                                                                                                                     (Json.Decode.oneOf
-                                                                                                                                  [ Json.Decode.maybe
-                                                                                                                                      Json.Decode.bool
-                                                                                                                                  , Json.Decode.nullable
-                                                                                                                                      Json.Decode.bool
-                                                                                                                                  ]
-                                                                                                                     )
+                                                                                                        (Json.Decode.oneOf
+                                                                                                                     [ Json.Decode.field
+                                                                                                                         "cleanFirst"
+                                                                                                                         (Json.Decode.oneOf
+                                                                                                                            [ Json.Decode.maybe
+                                                                                                                                  Json.Decode.bool
+                                                                                                                            , Json.Decode.nullable
+                                                                                                                                  Json.Decode.bool
+                                                                                                                            ]
+                                                                                                                         )
+                                                                                                                     , Json.Decode.succeed
+                                                                                                                         Nothing
+                                                                                                                     ]
                                                                                                         ) |> Json.Decode.Ext.andMap
-                                                                                                                         (Json.Decode.field
-                                                                                                                                      "debug"
-                                                                                                                                      (Json.Decode.oneOf
-                                                                                                                                                   [ Json.Decode.maybe
-                                                                                                                                                       Json.Decode.bool
-                                                                                                                                                   , Json.Decode.nullable
-                                                                                                                                                       Json.Decode.bool
-                                                                                                                                                   ]
-                                                                                                                                      )
+                                                                                                                         (Json.Decode.oneOf
+                                                                                                                                      [ Json.Decode.field
+                                                                                                                                          "debug"
+                                                                                                                                          (Json.Decode.oneOf
+                                                                                                                                             [ Json.Decode.maybe
+                                                                                                                                                   Json.Decode.bool
+                                                                                                                                             , Json.Decode.nullable
+                                                                                                                                                   Json.Decode.bool
+                                                                                                                                             ]
+                                                                                                                                          )
+                                                                                                                                      , Json.Decode.succeed
+                                                                                                                                          Nothing
+                                                                                                                                      ]
                                                                                                                          ) |> Json.Decode.Ext.andMap
-                                                                                                                                          (Json.Decode.field
-                                                                                                                                                       "elmCodegenOverrides"
-                                                                                                                                                       (Json.Decode.oneOf
-                                                                                                                                                                    [ Json.Decode.maybe
-                                                                                                                                                                        (Json.Decode.succeed
-                                                                                                                                                                           (\generatorModulePath ->
+                                                                                                                                          (Json.Decode.oneOf
+                                                                                                                                                       [ Json.Decode.field
+                                                                                                                                                           "elmCodegenOverrides"
+                                                                                                                                                           (Json.Decode.oneOf
+                                                                                                                                                              [ Json.Decode.maybe
+                                                                                                                                                                    (Json.Decode.succeed
+                                                                                                                                                                         (\generatorModulePath ->
                                                                                                                                                                               { generatorModulePath =
                                                                                                                                                                                   generatorModulePath
                                                                                                                                                                               }
-                                                                                                                                                                           ) |> Json.Decode.Ext.andMap
-                                                                                                                                                                                      (Json.Decode.field
-                                                                                                                                                                                             "generatorModulePath"
-                                                                                                                                                                                             (Json.Decode.oneOf
-                                                                                                                                                                                                    [ Json.Decode.maybe
-                                                                                                                                                                                                          Json.Decode.string
-                                                                                                                                                                                                    , Json.Decode.nullable
-                                                                                                                                                                                                          Json.Decode.string
-                                                                                                                                                                                                    ]
-                                                                                                                                                                                             )
+                                                                                                                                                                         ) |> Json.Decode.Ext.andMap
+                                                                                                                                                                                      (Json.Decode.oneOf
+                                                                                                                                                                                               [ Json.Decode.field
+                                                                                                                                                                                                   "generatorModulePath"
+                                                                                                                                                                                                   (Json.Decode.oneOf
+                                                                                                                                                                                                      [ Json.Decode.maybe
+                                                                                                                                                                                                            Json.Decode.string
+                                                                                                                                                                                                      , Json.Decode.nullable
+                                                                                                                                                                                                            Json.Decode.string
+                                                                                                                                                                                                      ]
+                                                                                                                                                                                                   )
+                                                                                                                                                                                               , Json.Decode.succeed
+                                                                                                                                                                                                   Nothing
+                                                                                                                                                                                               ]
                                                                                                                                                                                       )
-                                                                                                                                                                        )
-                                                                                                                                                                    , Json.Decode.nullable
-                                                                                                                                                                        (Json.Decode.succeed
-                                                                                                                                                                           (\generatorModulePath ->
+                                                                                                                                                                    )
+                                                                                                                                                              , Json.Decode.nullable
+                                                                                                                                                                    (Json.Decode.succeed
+                                                                                                                                                                         (\generatorModulePath ->
                                                                                                                                                                               { generatorModulePath =
                                                                                                                                                                                   generatorModulePath
                                                                                                                                                                               }
-                                                                                                                                                                           ) |> Json.Decode.Ext.andMap
-                                                                                                                                                                                      (Json.Decode.field
-                                                                                                                                                                                             "generatorModulePath"
-                                                                                                                                                                                             (Json.Decode.oneOf
-                                                                                                                                                                                                    [ Json.Decode.maybe
-                                                                                                                                                                                                          Json.Decode.string
-                                                                                                                                                                                                    , Json.Decode.nullable
-                                                                                                                                                                                                          Json.Decode.string
-                                                                                                                                                                                                    ]
-                                                                                                                                                                                             )
+                                                                                                                                                                         ) |> Json.Decode.Ext.andMap
+                                                                                                                                                                                      (Json.Decode.oneOf
+                                                                                                                                                                                               [ Json.Decode.field
+                                                                                                                                                                                                   "generatorModulePath"
+                                                                                                                                                                                                   (Json.Decode.oneOf
+                                                                                                                                                                                                      [ Json.Decode.maybe
+                                                                                                                                                                                                            Json.Decode.string
+                                                                                                                                                                                                      , Json.Decode.nullable
+                                                                                                                                                                                                            Json.Decode.string
+                                                                                                                                                                                                      ]
+                                                                                                                                                                                                   )
+                                                                                                                                                                                               , Json.Decode.succeed
+                                                                                                                                                                                                   Nothing
+                                                                                                                                                                                               ]
                                                                                                                                                                                       )
-                                                                                                                                                                        )
-                                                                                                                                                                    ]
-                                                                                                                                                       )
+                                                                                                                                                                    )
+                                                                                                                                                              ]
+                                                                                                                                                           )
+                                                                                                                                                       , Json.Decode.succeed
+                                                                                                                                                           Nothing
+                                                                                                                                                       ]
                                                                                                                                           ) |> Json.Decode.Ext.andMap
-                                                                                                                                                           (Json.Decode.field
-                                                                                                                                                                        "outputModuleNamespace"
-                                                                                                                                                                        (Json.Decode.oneOf
-                                                                                                                                                                                     [ Json.Decode.maybe
-                                                                                                                                                                                         (Json.Decode.list
-                                                                                                                                                                                            Json.Decode.string
-                                                                                                                                                                                         )
-                                                                                                                                                                                     , Json.Decode.nullable
-                                                                                                                                                                                         (Json.Decode.list
-                                                                                                                                                                                            Json.Decode.string
-                                                                                                                                                                                         )
-                                                                                                                                                                                     ]
-                                                                                                                                                                        )
+                                                                                                                                                           (Json.Decode.oneOf
+                                                                                                                                                                        [ Json.Decode.field
+                                                                                                                                                                            "outputModuleNamespace"
+                                                                                                                                                                            (Json.Decode.oneOf
+                                                                                                                                                                               [ Json.Decode.maybe
+                                                                                                                                                                                     (Json.Decode.list
+                                                                                                                                                                                          Json.Decode.string
+                                                                                                                                                                                     )
+                                                                                                                                                                               , Json.Decode.nullable
+                                                                                                                                                                                     (Json.Decode.list
+                                                                                                                                                                                          Json.Decode.string
+                                                                                                                                                                                     )
+                                                                                                                                                                               ]
+                                                                                                                                                                            )
+                                                                                                                                                                        , Json.Decode.succeed
+                                                                                                                                                                            Nothing
+                                                                                                                                                                        ]
                                                                                                                                                            ) |> Json.Decode.Ext.andMap
                                                                                                                                                                             (Json.Decode.field
                                                                                                                                                                                          "relativeInputPaths"
@@ -194,15 +221,19 @@ decoder =
                                                                                                                                                                                                           "relativeOutdir"
                                                                                                                                                                                                           Json.Decode.string
                                                                                                                                                                                              ) |> Json.Decode.Ext.andMap
-                                                                                                                                                                                                              (Json.Decode.field
-                                                                                                                                                                                                                           "relativePrepareScriptPath"
-                                                                                                                                                                                                                           (Json.Decode.oneOf
-                                                                                                                                                                                                                                        [ Json.Decode.maybe
-                                                                                                                                                                                                                                            Json.Decode.string
-                                                                                                                                                                                                                                        , Json.Decode.nullable
-                                                                                                                                                                                                                                            Json.Decode.string
-                                                                                                                                                                                                                                        ]
-                                                                                                                                                                                                                           )
+                                                                                                                                                                                                              (Json.Decode.oneOf
+                                                                                                                                                                                                                           [ Json.Decode.field
+                                                                                                                                                                                                                               "relativePrepareScriptPath"
+                                                                                                                                                                                                                               (Json.Decode.oneOf
+                                                                                                                                                                                                                                  [ Json.Decode.maybe
+                                                                                                                                                                                                                                        Json.Decode.string
+                                                                                                                                                                                                                                  , Json.Decode.nullable
+                                                                                                                                                                                                                                        Json.Decode.string
+                                                                                                                                                                                                                                  ]
+                                                                                                                                                                                                                               )
+                                                                                                                                                                                                                           , Json.Decode.succeed
+                                                                                                                                                                                                                               Nothing
+                                                                                                                                                                                                                           ]
                                                                                                                                                                                                               )
                                                                               )
                                                                      )

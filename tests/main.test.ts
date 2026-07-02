@@ -80,7 +80,7 @@ test("toRunPropsEntries threads cleanFirst/debug overrides into elmCodegenConfig
 })
 
 test("ouroboros stays a valid config that plans its own self-codegen sections", () => {
-  // runAll always runs ouroboros first; this guards that ouroboros keeps planning
+  // the CLI passes ouroboros to runAll explicitly; this guards that ouroboros keeps planning
   // cleanly (one entry per section) so that contract can't silently rot.
   const entries = toRunPropsEntries(ouroboros)
   assert.deepEqual(
