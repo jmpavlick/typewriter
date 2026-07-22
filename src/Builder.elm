@@ -56,21 +56,26 @@ build path ( moduleName, typedef ) =
                 _ ->
                     buildUnionTable <| collectUnions (String.Ext.toTypename moduleName) typedef
 
-        ( errs, decls ) =
-            List.Ext.partitionMapResult identity
-                [ toTypeDecl table typedef
-                , toDecoderDecl table typedef
-                ]
+        ( typeErrs, typeDecls ) =
+            List.Ext.partitionMapResult identity [ toTypeDecl table typedef ]
+
+        ( decoderErrs, decoderDecls ) =
+            List.Ext.partitionMapResult identity [ toDecoderDecl table typedef ]
+
+        hoisted =
+            hoistedUnionDecls table
 
         buildFile =
             Elm.file (List.map (String.Extra.toTitleCase << String.Extra.camelize) <| List.concat [ path, [ moduleName ] ])
     in
-    ( ( moduleName, errs )
-    , if List.length decls == 0 then
+    ( ( moduleName, typeErrs ++ decoderErrs )
+    , if List.length (typeDecls ++ decoderDecls) == 0 then
         Nothing
 
       else
-        Just <| buildFile (decls ++ hoistedUnionDecls table)
+        -- every type and alias up top, every decoder below: the shape of the data reads
+        -- as one block without decoder pipelines interleaved
+        Just <| buildFile (typeDecls ++ hoisted.types ++ decoderDecls ++ hoisted.decoders)
     )
 
 
@@ -162,6 +167,26 @@ typeAnnotationAttrs table =
                 always Nothing
         )
     , Ast.onRecord (always (Maybe.map <| Type.dict Type.string))
+
+    -- an enum-keyed record inlines as a record with one field per enum key, each
+    -- referencing the hoisted alias for the value type (re-wrapped in `Maybe` when the
+    -- value type was optional)
+    , Ast.onEnumRecord
+        (\keys inner _ ->
+            lookupEnumRecordValue table inner
+                |> Maybe.map
+                    (\( info, optional ) ->
+                        let
+                            fieldType =
+                                if optional then
+                                    Type.maybe (Type.named [] info.name)
+
+                                else
+                                    Type.named [] info.name
+                        in
+                        Type.record (List.map (\k -> ( String.Ext.toValidIdentifier k, fieldType )) keys)
+                    )
+        )
     , Ast.onObject
         (\_ dictOfMaybeAnnotations ->
             dictOfMaybeAnnotations
@@ -239,11 +264,13 @@ type alias UnionInfo =
     { name : String, kind : HoistedKind }
 
 
-{-| the two flavors of hoistable named union: a payload-free unit union (z.literal/z.enum)
-or a discriminated union whose variants carry object payloads -}
+{-| the flavors of hoistable named declaration: a payload-free unit union (z.literal/z.enum),
+a discriminated union whose variants carry object payloads, or the value type of an
+enum-keyed record (hoisted so the inlined record's fields can reference it by name) -}
 type HoistedKind
     = HoistUnit (List UnitVariant)
     | HoistDiscriminated { discriminator : String, variants : Dict String Ast.Value }
+    | HoistEnumRecordValue Ast.Value
 
 
 {-| one collected union awaiting a name, from the pre-pass walk -}
@@ -318,6 +345,9 @@ valueKey value =
 
         SRecord inner ->
             "rec(" ++ valueKey inner ++ ")"
+
+        SEnumRecord keys inner ->
+            "rec(" ++ String.join "," keys ++ ";" ++ valueKey inner ++ ")"
 
         SObject dict ->
             "obj(" ++ (Dict.toList dict |> List.map (\( k, v ) -> k ++ ":" ++ valueKey v) |> String.join ",") ++ ")"
@@ -405,6 +435,37 @@ lookupDiscriminated table du =
     Dict.get (discriminatedKey du) table
 
 
+{-| an enum record's value type, with a `.optional()` wrapper stripped off: the optionality
+belongs to the KEYS of the inlined record (each field becomes a `Maybe`), so the hoisted
+alias describes the present value -}
+enumRecordValue : Ast.Value -> { optional : Bool, value : Ast.Value }
+enumRecordValue inner =
+    case inner of
+        SOptional v ->
+            { optional = True, value = v }
+
+        _ ->
+            { optional = False, value = inner }
+
+
+{-| structural key for an enum record's (unwrapped) value type -}
+enumRecordKey : Ast.Value -> String
+enumRecordKey value =
+    "erv|" ++ valueKey value
+
+
+{-| look up the hoisted alias for an enum record's value type, alongside whether the raw
+value type was optional (and so must be re-wrapped in `Maybe` at each inlined field) -}
+lookupEnumRecordValue : UnionTable -> Ast.Value -> Maybe ( UnionInfo, Bool )
+lookupEnumRecordValue table inner =
+    let
+        { optional, value } =
+            enumRecordValue inner
+    in
+    Dict.get (enumRecordKey value) table
+        |> Maybe.map (\info -> ( info, optional ))
+
+
 {-| walk the AST collecting every hoistable union (unit or discriminated), carrying a
 breadcrumb-derived suggested name (an object field contributes its field name; wrapper nodes
 pass through). Returns collected entries in a stable order.
@@ -427,6 +488,18 @@ collectUnions suggested value =
 
         SRecord inner ->
             collectUnions suggested inner
+
+        SEnumRecord _ inner ->
+            -- register the (unwrapped) value type for hoisting under the breadcrumb name,
+            -- then recurse into it so unions nested inside the value are hoisted too
+            let
+                unwrapped =
+                    (enumRecordValue inner).value
+            in
+            -- the alias names ONE value of the record ("UnitGroup"), while the field
+            -- holding the record is naturally plural ("unit_groups") — singularize
+            { key = enumRecordKey unwrapped, suggested = String.Ext.singularize suggested, kind = HoistEnumRecordValue unwrapped }
+                :: collectUnions suggested unwrapped
 
         SOptional inner ->
             collectUnions suggested inner
@@ -524,36 +597,66 @@ unionTypeDecl name prefix units =
     Elm.customType name (List.map (\u -> Elm.variant (variantCtor prefix u)) units)
 
 
-{-| hoist every collected nested union to a top-level type + decoder declaration. Hoisted
-unions prefix their constructors with the type name to avoid cross-type collisions. -}
-hoistedUnionDecls : UnionTable -> List Elm.Declaration
+{-| hoist every collected nested union to a top-level type + decoder declaration, grouped
+so the file can put all types first and all decoders last. Hoisted unions prefix their
+constructors with the type name to avoid cross-type collisions. a declaration whose type
+maps but whose decoder can't yet be built keeps the type alone. -}
+hoistedUnionDecls : UnionTable -> { types : List Elm.Declaration, decoders : List Elm.Declaration }
 hoistedUnionDecls table =
     Dict.values table
-        |> List.concatMap
+        |> List.map
             (\{ name, kind } ->
                 case kind of
                     HoistUnit units ->
-                        case unitUnionDecoder name name units of
-                            Ok dec ->
-                                [ unionTypeDecl name name units
-                                , Elm.declaration (decoderName name) dec
-                                ]
+                        { types = [ unionTypeDecl name name units ]
+                        , decoders =
+                            case unitUnionDecoder name name units of
+                                Ok dec ->
+                                    [ Elm.declaration (decoderName name) dec ]
 
-                            Err _ ->
-                                -- type is still useful even if we can't yet build the decoder
-                                [ unionTypeDecl name name units ]
+                                Err _ ->
+                                    []
+                        }
 
                     HoistDiscriminated du ->
-                        case ( discriminatedUnionTypeDecl table name name du, discriminatedUnionDecoder table name name du ) of
-                            ( Ok typeDecl, Ok dec ) ->
-                                [ typeDecl, Elm.declaration (decoderName name) dec ]
+                        case discriminatedUnionTypeDecl table name name du of
+                            Ok typeDecl ->
+                                { types = [ typeDecl ]
+                                , decoders =
+                                    case discriminatedUnionDecoder table name name du of
+                                        Ok dec ->
+                                            [ Elm.declaration (decoderName name) dec ]
 
-                            ( Ok typeDecl, Err _ ) ->
-                                [ typeDecl ]
+                                        Err _ ->
+                                            []
+                                }
 
-                            _ ->
-                                []
+                            Err _ ->
+                                { types = [], decoders = [] }
+
+                    HoistEnumRecordValue value ->
+                        case Ast.optPara (typeAnnotationAttrs table) value of
+                            Just ann ->
+                                { types = [ Elm.alias name ann ]
+                                , decoders =
+                                    case Ast.optPara (decoderExprAttrs table) value of
+                                        Just dec ->
+                                            [ Elm.declaration (decoderName name) <|
+                                                Elm.withType (Type.named [] ("Json.Decode.Decoder " ++ name)) dec
+                                            ]
+
+                                        Nothing ->
+                                            []
+                                }
+
+                            Nothing ->
+                                { types = [], decoders = [] }
             )
+        |> (\groups ->
+                { types = List.concatMap .types groups
+                , decoders = List.concatMap .decoders groups
+                }
+           )
 
 
 
@@ -790,6 +893,11 @@ decoderExprAttrs table =
                 always Nothing
         )
     , Ast.onRecord (\_ innerDecoder -> Maybe.map GD.dict innerDecoder)
+    , Ast.onEnumRecord
+        (\keys inner _ ->
+            lookupEnumRecordValue table inner
+                |> Maybe.map (\( info, optional ) -> enumRecordDecoder keys optional info)
+        )
     , Ast.onObject
         (\rawFields dictOfMaybeDecoders ->
             dictOfMaybeDecoders
@@ -869,6 +977,37 @@ optionalKeyField name valueDecoder =
         [ GD.field name valueDecoder
         , GD.succeed Gen.Maybe.make_.nothing
         ]
+
+
+{-| decoder for an enum-keyed record, targeting the inline Elm record whose fields are the
+enum's keys and whose values reference the hoisted value-type decoder. an optional value
+type makes every key optional — an absent (or null) key decodes to `Nothing`, mirroring how
+`.optional()` object fields are read.
+-}
+enumRecordDecoder : List String -> Bool -> UnionInfo -> Elm.Expression
+enumRecordDecoder keys optional info =
+    let
+        valueDecoder =
+            Elm.val (decoderName info.name)
+
+        fieldDecoder key =
+            if optional then
+                optionalKeyField key <|
+                    GD.oneOf
+                        [ GD.maybe valueDecoder
+                        , GD.nullable valueDecoder
+                        ]
+
+            else
+                GD.field key valueDecoder
+
+        ctor =
+            Elm.function (List.map (\k -> ( String.Ext.toValidIdentifier k, Nothing )) keys)
+                (\argExprs ->
+                    Elm.record (List.map2 (\k expr -> ( String.Ext.toValidIdentifier k, expr )) keys argExprs)
+                )
+    in
+    pipeline (GD.succeed ctor) (List.map (\k -> GDE.andMap (fieldDecoder k)) keys)
 
 
 toObjectDecoder : List ( String, Bool, Elm.Expression ) -> Elm.Expression

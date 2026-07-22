@@ -20,4 +20,22 @@ suite =
             \() ->
                 String.Ext.toTypename "read-write"
                     |> Expect.equal "ReadWrite"
+        , describe "singularize"
+            [ test "drops a plural s" <|
+                \() ->
+                    String.Ext.singularize "UnitGroups"
+                        |> Expect.equal "UnitGroup"
+            , test "rewrites -ies to -y" <|
+                \() ->
+                    String.Ext.singularize "Entries"
+                        |> Expect.equal "Entry"
+            , test "leaves -ss and -us words alone" <|
+                \() ->
+                    ( String.Ext.singularize "Address", String.Ext.singularize "Status" )
+                        |> Expect.equal ( "Address", "Status" )
+            , test "leaves a singular word alone" <|
+                \() ->
+                    String.Ext.singularize "Facility"
+                        |> Expect.equal "Facility"
+            ]
         ]

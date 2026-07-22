@@ -3,6 +3,7 @@ module Ast exposing
     , decoder
     , Props, Attr
     , onString, onInt, onFloat, onBool
+    , onEnumRecord
     , onAny, onUnknown, onVoid, onUndefined, onNull, onNaN
     , onBigInt, onUrl, onIsoTime, onIsoDate, onDateTime
     , onUnimplemented
@@ -91,6 +92,7 @@ type Value
     | SSet Value
     | STuple (List Value)
     | SRecord Value
+    | SEnumRecord (List String) Value
     | SObject (Dict String Value)
     | SUnion (Dict String (List Value))
     | SDiscriminatedUnion { discriminator : String, variants : Dict String Value }
@@ -127,6 +129,7 @@ type alias Props a =
     , sSet : Value -> a -> a
     , sTuple : List Value -> List a -> a
     , sRecord : Value -> a -> a
+    , sEnumRecord : List String -> Value -> a -> a
     , sObject : Dict String Value -> Dict String a -> a
     , sUnion : Dict String (List Value) -> Dict String (List a) -> a
     , sDiscriminatedUnion : { discriminator : String, variants : Dict String Value } -> Dict String a -> a
@@ -211,6 +214,9 @@ para props value =
         SRecord inner ->
             props.sRecord inner (para props inner)
 
+        SEnumRecord keys inner ->
+            props.sEnumRecord keys inner (para props inner)
+
         SObject dict ->
             props.sObject dict (Dict.map (\_ v -> para props v) dict)
 
@@ -265,6 +271,7 @@ optPara attrs =
             , sSet = \_ _ -> Nothing
             , sTuple = \_ _ -> Nothing
             , sRecord = \_ _ -> Nothing
+            , sEnumRecord = \_ _ _ -> Nothing
             , sObject = \_ _ -> Nothing
             , sUnion = \_ _ -> Nothing
             , sDiscriminatedUnion = \_ _ -> Nothing
@@ -445,6 +452,10 @@ onRecord : (Value -> Maybe a -> Maybe a) -> Attr a
 onRecord fn base =
     { base | sRecord = fn }
 
+{-| -}
+onEnumRecord : (List String -> Value -> Maybe a -> Maybe a) -> Attr a
+onEnumRecord fn base =
+    { base | sEnumRecord = fn }
 
 {-| -}
 onObject : (Dict String Value -> Dict String (Maybe a) -> Maybe a) -> Attr a
@@ -585,8 +596,12 @@ decodeHelp =
                                             D.at [ "def", "valueType" ] <|
                                                 decoder
 
+                                    else if keyTypeType == "enum" then
+                                        D.map2 SEnumRecord (D.at ["def", "keyType", "options"] (D.list D.string))
+                                            (D.at ["def", "valueType"] decoder)
+
                                     else
-                                        D.fail "Currently, only string-keyed records are supported (sorry, i'll get to it)"
+                                        D.fail "Currently, only string-keyed and enum-keyed records are supported (sorry, i'll get to it)"
                                 )
                                 (D.at [ "def", "keyType", "type" ] D.string)
 

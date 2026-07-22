@@ -367,3 +367,20 @@ export const wrappersInObject = z.object({
 export const recordInObject = z.object({
   sections: z.record(z.string(), z.object({ some: z.int(), recordThing: z.string() })),
 })
+
+// enum records: the value type hoists to a named alias (named for the field holding the
+// record), the record inlines as one field per enum key. an optional value type unwraps
+// for the alias and re-wraps each inlined field in Maybe.
+export const enumRecordInObject = z.object({
+  unit_groups: z.record(
+    z.enum(["closet", "small", "parking"]),
+    z.object({ priority: z.int(), label: z.string() }).optional(),
+  ),
+})
+export const enumRecordRequiredValues = z.object({
+  sizes: z.record(z.enum(["first", "second"]), z.object({ n: z.int() })),
+})
+export const enumRecordToplevel = z.record(
+  z.enum(["left", "right"]),
+  z.object({ n: z.int() }).optional(),
+)

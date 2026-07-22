@@ -110,6 +110,16 @@ suite =
                 -- z.set(z.string())
                 D.decodeString Ast.decoder """{"def":{"type":"set","valueType":{"def":{"type":"string"},"type":"string"}},"type":"set"}"""
                     |> Expect.equal (Ok (SSet SString))
+        , test "should decode an enum-keyed record as SEnumRecord, keys in declaration order" <|
+            \() ->
+                -- z.record(z.enum(["left", "right"]), z.object({ n: z.int() }).optional())
+                D.decodeString Ast.decoder """{"def":{"type":"record","keyType":{"def":{"type":"enum","entries":{"left":"left","right":"right"}},"type":"enum","options":["left","right"]},"valueType":{"def":{"type":"optional","innerType":{"def":{"type":"object","shape":{"n":{"def":{"type":"number","check":"number_format","abort":false,"format":"safeint"},"type":"number","isInt":true}}},"type":"object"}},"type":"optional"}},"type":"record"}"""
+                    |> Expect.equal
+                        (Ok
+                            (SEnumRecord [ "left", "right" ]
+                                (SOptional (SObject (Dict.fromList [ ( "n", SInt ) ])))
+                            )
+                        )
         , test "should decode a numeric nativeEnum (with TS reverse mappings) as an int-valued union" <|
             \() ->
                 -- z.nativeEnum(enum { Red, Green }) — entries carry both forward and reverse mappings
