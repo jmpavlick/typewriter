@@ -10,7 +10,7 @@
     "generate": "tsx index.ts",
     "test:all": "pnpm test:unit && elm-test && pnpm test:ts",
     "test:unit": "node --import tsx --test \"tests/**/*.test.ts\"",
-    "test:ts": "pnpm typecheck && tsx index.ts",
+    "test:ts": "pnpm typecheck:ts && tsx index.ts",
     "test:elm:watch": "elm-test --watch --no-clear-console",
     "test:ts:watch": "chokidar \"tsconfig.json\" \"*.ts\" \"codegen/**/*\" \"lib/**/*\" \"src/**/*\" \"tests/**/*\" -c \"pnpm test:ts\"",
     "test:watch": "concurrently \"pnpm test:elm:watch\" \"pnpm test:ts:watch\"",

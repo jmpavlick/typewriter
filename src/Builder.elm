@@ -129,7 +129,7 @@ typeAnnotationAttrs table =
     , Ast.onFloat Type.float
     , Ast.onBool Type.bool
     , Ast.onAny Gen.Javascript.annotation_.any
-    , Ast.onUnknown Gen.Javascript.annotation_.unknown
+    , Ast.onUnknown GD.annotation_.value
     , Ast.onVoid Gen.Javascript.annotation_.void
     , Ast.onUndefined Gen.Javascript.annotation_.undefined
     , Ast.onNull Gen.Javascript.annotation_.null
@@ -193,7 +193,10 @@ typeAnnotationAttrs table =
                 |> Dict.toList
                 |> List.foldr
                     (\( k, maybeAnnotation ) acc ->
-                        Maybe.map2 (\annotation rest -> ( k, annotation ) :: rest) maybeAnnotation acc
+                        -- the WIRE key can be anything JSON allows ("_id"); the Elm field name
+                        -- can't. Sanitize the field name only — the decoder still reads the raw
+                        -- wire key (see toObjectDecoder), so only the record's spelling changes.
+                        Maybe.map2 (\annotation rest -> ( String.Ext.toValidIdentifier k, annotation ) :: rest) maybeAnnotation acc
                     )
                     (Just [])
                 |> Maybe.map Type.record
@@ -1013,10 +1016,13 @@ enumRecordDecoder keys optional info =
 toObjectDecoder : List ( String, Bool, Elm.Expression ) -> Elm.Expression
 toObjectDecoder fields =
     let
-        -- Argument specs for the constructor: [("field1", Nothing), ("field2", Nothing)]
+        -- Argument specs for the constructor: [("field1", Nothing), ("field2", Nothing)].
+        -- lambda args and record keys are ELM identifiers, so they get the sanitized spelling
+        -- ("_id" -> "id"); the wire reads below keep the raw key. Must mirror the type-side
+        -- sanitization in typeAnnotationAttrs' onObject or the record and its decoder disagree.
         argSpecs : List ( String, Maybe Type.Annotation )
         argSpecs =
-            List.map (\( name, _, _ ) -> ( name, Nothing )) fields
+            List.map (\( name, _, _ ) -> ( String.Ext.toValidIdentifier name, Nothing )) fields
 
         -- Build the record constructor: \field1 field2 -> { field1 = field1, field2 = field2 }
         ctor : Elm.Expression
@@ -1025,7 +1031,7 @@ toObjectDecoder fields =
                 (\argExprs ->
                     Elm.record
                         (List.map2
-                            (\( name, _, _ ) expr -> ( name, expr ))
+                            (\( name, _, _ ) expr -> ( String.Ext.toValidIdentifier name, expr ))
                             fields
                             argExprs
                         )

@@ -137,4 +137,36 @@ suite =
                                 }
                             )
                         )
+        , test "should INFER a discriminator for a plain union of objects sharing a required literal prop" <|
+            \() ->
+                -- z.union([ z.object({ __typename: z.literal("CallToActionAnchor"), anchor: z.string() }),
+                --           z.object({ __typename: z.literal("CallToActionLink"), url: z.string() }) ])
+                -- no "discriminator" in the def — __typename qualifies in every option, so it's inferred
+                D.decodeString Ast.decoder """{"def":{"type":"union","options":[{"def":{"type":"object","shape":{"__typename":{"def":{"type":"literal","values":["CallToActionAnchor"]},"type":"literal"},"anchor":{"def":{"type":"string"},"type":"string"}}},"type":"object"},{"def":{"type":"object","shape":{"__typename":{"def":{"type":"literal","values":["CallToActionLink"]},"type":"literal"},"url":{"def":{"type":"string"},"type":"string"}}},"type":"object"}]},"type":"union"}"""
+                    |> Expect.equal
+                        (Ok
+                            (SDiscriminatedUnion
+                                { discriminator = "__typename"
+                                , variants =
+                                    Dict.fromList
+                                        [ ( "CallToActionAnchor", SObject (Dict.fromList [ ( "anchor", SString ) ]) )
+                                        , ( "CallToActionLink", SObject (Dict.fromList [ ( "url", SString ) ]) )
+                                        ]
+                                }
+                            )
+                        )
+        , test "should NOT infer when options share no discriminating literal — stays a plain (positionally-keyed) union" <|
+            \() ->
+                -- z.union([ z.object({ a: z.string() }), z.object({ b: z.string() }) ])
+                D.decodeString Ast.decoder """{"def":{"type":"union","options":[{"def":{"type":"object","shape":{"a":{"def":{"type":"string"},"type":"string"}}},"type":"object"},{"def":{"type":"object","shape":{"b":{"def":{"type":"string"},"type":"string"}}},"type":"object"}]},"type":"union"}"""
+                    |> Expect.equal
+                        (Ok
+                            (SUnion
+                                (Dict.fromList
+                                    [ ( "Variant0", [ SObject (Dict.fromList [ ( "a", SString ) ]) ] )
+                                    , ( "Variant1", [ SObject (Dict.fromList [ ( "b", SString ) ]) ] )
+                                    ]
+                                )
+                            )
+                        )
         ]

@@ -57,6 +57,7 @@ module Ast exposing
 
 import Dict exposing (Dict)
 import Json.Decode as D exposing (Decoder)
+import Set
 import String.Ext
 
 
@@ -685,11 +686,37 @@ decodeHelp =
                                                     Nothing ->
                                                         D.fail "union has a discriminator but options aren't discriminable objects"
                                             )
+
+                                -- a PLAIN z.union of objects declares no discriminator, but one is often
+                                -- sitting right there: a prop that is a required single-string-literal in
+                                -- every option (graphql codegen's `__typename: z.literal(...)` is exactly
+                                -- this shape). Infer it and take the discriminated path — same variants,
+                                -- same codegen — instead of degrading to the error module.
+                                inferredDiscriminatedUnionDecoder =
+                                    D.at [ "def", "options" ] (D.list decoder)
+                                        |> D.andThen
+                                            (\options ->
+                                                inferDiscriminator options
+                                                    |> Maybe.andThen
+                                                        (\discriminator ->
+                                                            extractDiscriminatedVariants discriminator options
+                                                                |> Maybe.map
+                                                                    (\variants ->
+                                                                        SDiscriminatedUnion
+                                                                            { discriminator = discriminator
+                                                                            , variants = variants
+                                                                            }
+                                                                    )
+                                                        )
+                                                    |> Maybe.map D.succeed
+                                                    |> Maybe.withDefault (D.fail "no single-literal prop discriminates every option")
+                                            )
                             in
                             -- guard: unsupported union shapes degrade to SUnimplemented rather than
                             -- hard-failing the whole file's decode
                             D.oneOf
                                 [ discriminatedUnionDecoder
+                                , inferredDiscriminatedUnionDecoder
                                 , plainUnionDecoder
                                 , D.succeed (SUnimplemented "union (unsupported shape)")
                                 ]
@@ -774,6 +801,69 @@ decodeHelp =
                             D.succeed <| SUnimplemented type_
                 )
         ]
+
+
+{-| The most-naive inference for a plain z.union: a prop that is a required single-string-literal
+in EVERY object option, with pairwise-distinct wire values, discriminates the union.
+"\_\_typename" wins when it qualifies (the graphql-codegen convention); otherwise the
+alphabetically-first qualifying key, so the choice is deterministic. Returns Nothing when any
+option isn't an object or no key qualifies — the caller falls through to the plain-union path.
+-}
+inferDiscriminator : List Value -> Maybe String
+inferDiscriminator options =
+    let
+        -- z.literal("x") decodes to a single-variant SUnion carrying its wire value
+        literalWire : Value -> Maybe String
+        literalWire value =
+            case value of
+                SUnion variants ->
+                    case Dict.values variants of
+                        [ [ SLiteralString wire ] ] ->
+                            Just wire
+
+                        _ ->
+                            Nothing
+
+                _ ->
+                    Nothing
+
+        toShape : Value -> Maybe (Dict String Value)
+        toShape value =
+            case value of
+                SObject shape ->
+                    Just shape
+
+                _ ->
+                    Nothing
+
+        discriminates : List (Dict String Value) -> String -> Bool
+        discriminates shapes key =
+            let
+                wires =
+                    List.filterMap (Dict.get key >> Maybe.andThen literalWire) shapes
+            in
+            (List.length wires == List.length shapes)
+                && (Set.size (Set.fromList wires) == List.length wires)
+    in
+    options
+        |> List.foldr (\option -> Maybe.map2 (::) (toShape option)) (Just [])
+        |> Maybe.andThen
+            (\shapes ->
+                case shapes of
+                    [] ->
+                        Nothing
+
+                    first :: _ ->
+                        let
+                            candidates =
+                                List.filter (discriminates shapes) (Dict.keys first)
+                        in
+                        if List.member "__typename" candidates then
+                            Just "__typename"
+
+                        else
+                            List.head candidates
+            )
 
 
 {-| For a discriminated union, pair each object option with its discriminant wire value

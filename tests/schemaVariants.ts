@@ -325,6 +325,41 @@ export const notification = z.object({
   ]),
 })
 
+// a PLAIN z.union of objects — no declared discriminator, but every option carries a required
+// single-string-literal `__typename` (graphql codegen's union-selection shape, verbatim from
+// contentful's CallToAction targetLocation). Typewriter infers the discriminator and generates
+// the same custom type + decoder the explicit z.discriminatedUnion path gets.
+export const inferredTypenameUnion = z.union([
+  z.object({
+    __typename: z.literal("CallToActionAnchor"),
+    anchor: z.string().optional().nullable(),
+  }),
+  z.object({
+    __typename: z.literal("CallToActionLink"),
+    url: z.string().optional().nullable(),
+    target: z.string().optional().nullable(),
+  }),
+])
+
+// a wire key that is not a valid Elm record field ("_id", contentful's sys id) — the Elm field
+// gets the sanitized spelling, the decoder still reads the raw wire key
+export const underscoreFields = z.object({
+  _id: z.string(),
+  linkText: z.string().optional().nullable(),
+})
+
+// inference is convention-free — ANY shared required literal prop qualifies, nested in an object
+// field and wrapped nullish (the position it holds in the wild)
+export const inferredKindUnion = z.object({
+  shape: z
+    .union([
+      z.object({ kind: z.literal("circle"), radius: z.number() }),
+      z.object({ kind: z.literal("rect"), width: z.number(), height: z.number() }),
+    ])
+    .optional()
+    .nullable(),
+})
+
 // tuples (2 -> pair, 3 -> triple, 4+ -> right-nested pairs)
 export const pairTuple = z.tuple([z.string(), z.int()])
 export const tripleTuple = z.tuple([z.string(), z.int(), z.boolean()])
