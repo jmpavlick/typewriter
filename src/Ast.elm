@@ -598,7 +598,26 @@ decodeHelp =
                                                 decoder
 
                                     else if keyTypeType == "enum" then
-                                        D.map2 SEnumRecord (D.at ["def", "keyType", "options"] (D.list D.string))
+                                        -- `def.partial` is stamped by the TS serializer for
+                                        -- z.partialRecord (zod hides partiality in internal state).
+                                        -- by the time codegen runs, keys-optional IS value-optional:
+                                        -- wrap the value in SOptional (unless it already is)
+                                        D.map3
+                                            (\keys partial inner ->
+                                                SEnumRecord keys
+                                                    (case ( partial, inner ) of
+                                                        ( True, SOptional _ ) ->
+                                                            inner
+
+                                                        ( True, _ ) ->
+                                                            SOptional inner
+
+                                                        ( False, _ ) ->
+                                                            inner
+                                                    )
+                                            )
+                                            (D.at ["def", "keyType", "options"] (D.list D.string))
+                                            (D.oneOf [ D.at ["def", "partial"] D.bool, D.succeed False ])
                                             (D.at ["def", "valueType"] decoder)
 
                                     else

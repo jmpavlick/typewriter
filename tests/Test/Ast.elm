@@ -120,6 +120,27 @@ suite =
                                 (SOptional (SObject (Dict.fromList [ ( "n", SInt ) ])))
                             )
                         )
+        , test "should decode a PARTIAL enum-keyed record by wrapping a non-optional value in SOptional" <|
+            \() ->
+                -- z.partialRecord(z.enum(["left", "right"]), z.object({ n: z.int() })) — the TS
+                -- serializer stamps def.partial; partiality implies value optionality
+                D.decodeString Ast.decoder """{"def":{"type":"record","partial":true,"keyType":{"def":{"type":"enum","entries":{"left":"left","right":"right"}},"type":"enum","options":["left","right"]},"valueType":{"def":{"type":"object","shape":{"n":{"def":{"type":"number","check":"number_format","abort":false,"format":"safeint"},"type":"number","isInt":true}}},"type":"object"}},"type":"record"}"""
+                    |> Expect.equal
+                        (Ok
+                            (SEnumRecord [ "left", "right" ]
+                                (SOptional (SObject (Dict.fromList [ ( "n", SInt ) ])))
+                            )
+                        )
+        , test "should decode a PARTIAL enum-keyed record with an already-optional value WITHOUT double-wrapping" <|
+            \() ->
+                -- z.partialRecord(z.enum(["left", "right"]), z.object({ n: z.int() }).optional())
+                D.decodeString Ast.decoder """{"def":{"type":"record","partial":true,"keyType":{"def":{"type":"enum","entries":{"left":"left","right":"right"}},"type":"enum","options":["left","right"]},"valueType":{"def":{"type":"optional","innerType":{"def":{"type":"object","shape":{"n":{"def":{"type":"number","check":"number_format","abort":false,"format":"safeint"},"type":"number","isInt":true}}},"type":"object"}},"type":"optional"}},"type":"record"}"""
+                    |> Expect.equal
+                        (Ok
+                            (SEnumRecord [ "left", "right" ]
+                                (SOptional (SObject (Dict.fromList [ ( "n", SInt ) ])))
+                            )
+                        )
         , test "should decode a numeric nativeEnum (with TS reverse mappings) as an int-valued union" <|
             \() ->
                 -- z.nativeEnum(enum { Red, Green }) — entries carry both forward and reverse mappings

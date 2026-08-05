@@ -24,6 +24,20 @@ export const toSerializable = (decls: unknown): unknown => {
         }
         if (ancestors.some((a) => a.value === value)) return undefined
         ancestors.push({ holder: this, value: value as object })
+
+        // `z.partialRecord` serializes identically to `z.record` — zod keeps partiality only in
+        // the keyType's internal `_zod.values` (a Set on the exhaustive record, undefined on the
+        // partial one), which stringify never emits. Stamp it onto the def IN PLACE (a copy would
+        // break the ancestor identities the cycle guard relies on) so the Elm decoder can see it.
+        const def = value as Record<string, unknown>
+        if (
+          def.type === "record" &&
+          def.keyType instanceof z.ZodType &&
+          def.keyType.def.type === "enum" &&
+          def.keyType._zod.values === undefined
+        ) {
+          def.partial = true
+        }
       }
       return value
     }),

@@ -419,3 +419,9 @@ export const enumRecordToplevel = z.record(
   z.enum(["left", "right"]),
   z.object({ n: z.int() }).optional(),
 )
+
+// a PARTIAL enum record: z.partialRecord's keys-optional semantics ride the serializer's
+// def.partial stamp — no `.optional()` on the value needed, partiality implies it
+export const partialEnumRecordInObject = z.object({
+  headings: z.partialRecord(z.enum(["main", "footer"]), z.object({ text: z.string() })),
+})

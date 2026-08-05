@@ -1,5 +1,6 @@
 import { test } from "node:test"
 import assert from "node:assert/strict"
+import z from "zod"
 import * as path from "path"
 import { fileURLToPath } from "url"
 import { type ConfigParams, packageRoot, toConfig } from "../src/config.js"
@@ -104,6 +105,19 @@ test("toSerializable drops true cycles but keeps shared (DAG) references and all
   assert.deepEqual(out.a, { v: 1 })
   assert.deepEqual(out.b, { v: 1 })
   assert.equal(out.a.parent, undefined) // only its cyclic back-edge is gone
+})
+
+test("toSerializable stamps `partial` onto enum-keyed partialRecord defs (zod keeps partiality in internal state stringify never emits)", () => {
+  const out = toSerializable({
+    part: z.partialRecord(z.enum(["a", "b"]), z.string()),
+    full: z.record(z.enum(["a", "b"]), z.string()),
+    stringKeyed: z.partialRecord(z.string(), z.string()),
+  }) as Record<string, any>
+
+  assert.equal(out.part.def.partial, true)
+  assert.equal("partial" in out.full.def, false)
+  // string-keyed records generate as Dict — missing keys are already the natural case
+  assert.equal("partial" in out.stringKeyed.def, false)
 })
 
 test("ouroboros plans absolute, package-rooted paths so runAll is cwd-independent", () => {
