@@ -1,9 +1,11 @@
-module Gen.Hour.Ext exposing ( moduleName_, decoder, values_ )
+module Gen.Hour.Ext exposing
+    ( moduleName_, decoder, encoder, call_, values_
+    )
 
 {-|
 # Generated bindings for Hour.Ext
 
-@docs moduleName_, decoder, values_
+@docs moduleName_, decoder, encoder, call_, values_
 -}
 
 
@@ -33,7 +35,49 @@ decoder =
         }
 
 
-values_ : { decoder : Elm.Expression }
+{-| encoder: Hour.Time -> Json.Encode.Value -}
+encoder : Elm.Expression -> Elm.Expression
+encoder encoderArg_ =
+    Elm.apply
+        (Elm.value
+             { importFrom = [ "Hour", "Ext" ]
+             , name = "encoder"
+             , annotation =
+                 Just
+                     (Type.function
+                          [ Type.namedWith [ "Hour" ] "Time" [] ]
+                          (Type.namedWith [ "Json", "Encode" ] "Value" [])
+                     )
+             }
+        )
+        [ encoderArg_ ]
+
+
+call_ : { encoder : Elm.Expression -> Elm.Expression }
+call_ =
+    { encoder =
+        \encoderArg_ ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "Hour", "Ext" ]
+                     , name = "encoder"
+                     , annotation =
+                         Just
+                             (Type.function
+                                  [ Type.namedWith [ "Hour" ] "Time" [] ]
+                                  (Type.namedWith
+                                       [ "Json", "Encode" ]
+                                       "Value"
+                                       []
+                                  )
+                             )
+                     }
+                )
+                [ encoderArg_ ]
+    }
+
+
+values_ : { decoder : Elm.Expression, encoder : Elm.Expression }
 values_ =
     { decoder =
         Elm.value
@@ -45,6 +89,17 @@ values_ =
                          [ "Json", "Decode" ]
                          "Decoder"
                          [ Type.namedWith [ "Hour" ] "Time" [] ]
+                    )
+            }
+    , encoder =
+        Elm.value
+            { importFrom = [ "Hour", "Ext" ]
+            , name = "encoder"
+            , annotation =
+                Just
+                    (Type.function
+                         [ Type.namedWith [ "Hour" ] "Time" [] ]
+                         (Type.namedWith [ "Json", "Encode" ] "Value" [])
                     )
             }
     }

@@ -1,9 +1,11 @@
-module Gen.BigInt.Ext exposing ( moduleName_, decoder, values_ )
+module Gen.BigInt.Ext exposing
+    ( moduleName_, decoder, encoder, call_, values_
+    )
 
 {-|
 # Generated bindings for BigInt.Ext
 
-@docs moduleName_, decoder, values_
+@docs moduleName_, decoder, encoder, call_, values_
 -}
 
 
@@ -33,7 +35,53 @@ decoder =
         }
 
 
-values_ : { decoder : Elm.Expression }
+{-| {-| decimal string, which `decoder` accepts via `BigInt.fromIntString`
+-}
+
+encoder: BigInt.BigInt -> Json.Encode.Value
+-}
+encoder : Elm.Expression -> Elm.Expression
+encoder encoderArg_ =
+    Elm.apply
+        (Elm.value
+             { importFrom = [ "BigInt", "Ext" ]
+             , name = "encoder"
+             , annotation =
+                 Just
+                     (Type.function
+                          [ Type.namedWith [ "BigInt" ] "BigInt" [] ]
+                          (Type.namedWith [ "Json", "Encode" ] "Value" [])
+                     )
+             }
+        )
+        [ encoderArg_ ]
+
+
+call_ : { encoder : Elm.Expression -> Elm.Expression }
+call_ =
+    { encoder =
+        \encoderArg_ ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "BigInt", "Ext" ]
+                     , name = "encoder"
+                     , annotation =
+                         Just
+                             (Type.function
+                                  [ Type.namedWith [ "BigInt" ] "BigInt" [] ]
+                                  (Type.namedWith
+                                       [ "Json", "Encode" ]
+                                       "Value"
+                                       []
+                                  )
+                             )
+                     }
+                )
+                [ encoderArg_ ]
+    }
+
+
+values_ : { decoder : Elm.Expression, encoder : Elm.Expression }
 values_ =
     { decoder =
         Elm.value
@@ -45,6 +93,17 @@ values_ =
                          [ "Json", "Decode" ]
                          "Decoder"
                          [ Type.namedWith [ "BigInt" ] "BigInt" [] ]
+                    )
+            }
+    , encoder =
+        Elm.value
+            { importFrom = [ "BigInt", "Ext" ]
+            , name = "encoder"
+            , annotation =
+                Just
+                    (Type.function
+                         [ Type.namedWith [ "BigInt" ] "BigInt" [] ]
+                         (Type.namedWith [ "Json", "Encode" ] "Value" [])
                     )
             }
     }

@@ -9,10 +9,10 @@
             "elm/time": "1.0.0",
             "rtfeldman/elm-iso8601-date-strings": "1.1.4",
             "justinmimbs/date": "4.1.0",
-            "fabiommendes/elm-hour": "1.0.1"
+            "fabiommendes/elm-hour": "1.0.1",
+            "elm-community/json-extra": "4.3.0"
         },
         "local": [
-            "lib/Json/Decode/Ext.elm",
             "lib/Elm/Ext.elm",
             "lib/BigInt/Ext.elm",
             "lib/Url/Ext.elm",

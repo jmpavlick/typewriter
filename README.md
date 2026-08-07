@@ -1,9 +1,10 @@
 # typewriter
 
-Generates Elm types and decoders from [Zod](https://zod.dev) schemas.
+Generates Elm types, decoders, and encoders from [Zod](https://zod.dev) schemas.
 
 Point it at a `.ts` file that exports Zod schemas, run it, and get a directory of Elm modules —
-one per exported schema, each with a `Value` type and a `Json.Decode.Decoder Value`.
+one per exported schema, each with a `Value` type, a `Json.Decode.Decoder Value`, and a matching
+`Value -> Json.Encode.Value` encoder, generated so that `decodeValue decoder (encoder v) == Ok v`.
 
 ## How to hold it
 
@@ -76,10 +77,16 @@ type alias Value =
 decoder : Json.Decode.Decoder Value
 decoder = ...
 
+encoder : Value -> Json.Encode.Value
+encoder = ...
+
 type Role = RoleAdmin | RoleUser   -- nested unions are hoisted to named types
 
 roleDecoder : Json.Decode.Decoder Role
 roleDecoder = ...
+
+roleEncoder : Role -> Json.Encode.Value
+roleEncoder = ...
 ```
 
 ### The safety net
@@ -91,7 +98,12 @@ half-generated. So the way to find out whether your schemas are fully supported 
 
 ## What's supported
 
-Generates a type **and** a working decoder, compiling cleanly:
+Generates a type, a working decoder, **and** a matching encoder, compiling cleanly. The
+encoder is the decoder's inverse: `Json.Decode.decodeValue decoder (encoder v) == Ok v` for
+every generated module (`tests/Test/Roundtrip.elm` holds the law to the fire). A few encoding
+choices worth knowing: flattened `optional` / `nullable` / `nullish` values encode `Nothing`
+as `null` (with the field present), `bigint` encodes as a decimal string, and the phantom
+leaves (`nan` / `void` / `undefined` / `null`) all encode as `null`.
 
 - All primitives, `optional` / `nullable` / `nullish`, arrays, nested objects
 - `z.record` (string-keyed) → `Dict String v`; `z.map` (string-keyed) → `Dict String v`

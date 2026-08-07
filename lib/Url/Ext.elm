@@ -1,7 +1,13 @@
 module Url.Ext exposing (..)
 
 import Json.Decode as D exposing (Decoder)
+import Json.Encode as E
 import Url exposing (Url)
+
+
+encoder : Url -> E.Value
+encoder =
+    E.string << Url.toString
 
 
 decoder : Decoder Url

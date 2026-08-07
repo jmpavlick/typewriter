@@ -14,6 +14,11 @@ type NaN
     = NaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNaNa
 
 
+nanEncoder : NaN -> Json.Encode.Value
+nanEncoder _ =
+    Json.Encode.null
+
+
 nanDecoder : Decoder NaN
 nanDecoder =
     D.oneOf
@@ -34,6 +39,11 @@ type Void
     = Void
 
 
+voidEncoder : Void -> Json.Encode.Value
+voidEncoder _ =
+    Json.Encode.null
+
+
 voidDecoder : Decoder Void
 voidDecoder =
     D.succeed Void
@@ -41,6 +51,11 @@ voidDecoder =
 
 type Undefined
     = Undefined
+
+
+undefinedEncoder : Undefined -> Json.Encode.Value
+undefinedEncoder _ =
+    Json.Encode.null
 
 
 undefinedDecoder : Decoder Undefined
@@ -58,6 +73,11 @@ type alias Any =
 
 type Null
     = Null
+
+
+nullEncoder : Null -> Json.Encode.Value
+nullEncoder _ =
+    Json.Encode.null
 
 
 nullDecoder : Decoder Null

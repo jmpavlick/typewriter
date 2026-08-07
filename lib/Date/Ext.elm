@@ -2,6 +2,12 @@ module Date.Ext exposing (..)
 
 import Date exposing (Date)
 import Json.Decode as D exposing (Decoder)
+import Json.Encode as E
+
+
+encoder : Date -> E.Value
+encoder =
+    E.string << Date.toIsoString
 
 
 decoder : Decoder Date

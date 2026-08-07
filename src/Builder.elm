@@ -4,9 +4,11 @@ import Ast exposing (Value(..))
 import Dict exposing (Dict)
 import Elm
 import Elm.Annotation as Type
+import Elm.Arg
 import Elm.Case
-import Elm.Op
 import Elm.Ext exposing (pipeline)
+import Elm.Op
+import Gen.Basics
 import Gen.BigInt
 import Gen.BigInt.Ext
 import Gen.Date
@@ -16,11 +18,12 @@ import Gen.Hour.Ext
 import Gen.Iso8601
 import Gen.Javascript
 import Gen.Json.Decode as GD
-import Gen.Json.Decode.Ext as GDE
+import Gen.Json.Decode.Extra as GDE
 import Gen.Json.Encode as GE
 import Gen.Maybe
 import Gen.Set
 import Gen.Time
+import Gen.Tuple
 import Gen.Url
 import Gen.Url.Ext
 import List.Ext
@@ -62,20 +65,23 @@ build path ( moduleName, typedef ) =
         ( decoderErrs, decoderDecls ) =
             List.Ext.partitionMapResult identity [ toDecoderDecl table typedef ]
 
+        ( encoderErrs, encoderDecls ) =
+            List.Ext.partitionMapResult identity [ toEncoderDecl table typedef ]
+
         hoisted =
             hoistedUnionDecls table
 
         buildFile =
             Elm.file (List.map (String.Extra.toTitleCase << String.Extra.camelize) <| List.concat [ path, [ moduleName ] ])
     in
-    ( ( moduleName, typeErrs ++ decoderErrs )
+    ( ( moduleName, typeErrs ++ decoderErrs ++ encoderErrs )
     , if List.length (typeDecls ++ decoderDecls) == 0 then
         Nothing
 
       else
-        -- every type and alias up top, every decoder below: the shape of the data reads
-        -- as one block without decoder pipelines interleaved
-        Just <| buildFile (typeDecls ++ hoisted.types ++ decoderDecls ++ hoisted.decoders)
+        -- every type and alias up top, every decoder below, every encoder last: the shape
+        -- of the data reads as one block without decoder pipelines interleaved
+        Just <| buildFile (typeDecls ++ hoisted.types ++ decoderDecls ++ hoisted.decoders ++ encoderDecls ++ hoisted.encoders)
     )
 
 
@@ -83,14 +89,16 @@ build path ( moduleName, typedef ) =
 -- TYPE DECLARATIONS
 
 
-{-| `List (Maybe a) -> Maybe (List a)` — all-or-nothing: every element must be present -}
+{-| `List (Maybe a) -> Maybe (List a)` — all-or-nothing: every element must be present
+-}
 sequenceMaybes : List (Maybe a) -> Maybe (List a)
 sequenceMaybes =
     List.foldr (Maybe.map2 (::)) (Just [])
 
 
 {-| right-associate a list into nested pairs via `pair`: [a,b,c,d] -> pair a (pair b (pair c d)).
-A single element returns itself; an empty list has no pairing. -}
+A single element returns itself; an empty list has no pairing.
+-}
 rightNestPairs : (a -> a -> a) -> List a -> Maybe a
 rightNestPairs pair items =
     case items of
@@ -104,7 +112,8 @@ rightNestPairs pair items =
             Maybe.map (pair x) (rightNestPairs pair rest)
 
 
-{-| whether a value's type is usable as an Elm `Set` element / `comparable` -}
+{-| whether a value's type is usable as an Elm `Set` element / `comparable`
+-}
 isComparable : Ast.Value -> Bool
 isComparable value =
     case value of
@@ -269,20 +278,23 @@ type alias UnionInfo =
 
 {-| the flavors of hoistable named declaration: a payload-free unit union (z.literal/z.enum),
 a discriminated union whose variants carry object payloads, or the value type of an
-enum-keyed record (hoisted so the inlined record's fields can reference it by name) -}
+enum-keyed record (hoisted so the inlined record's fields can reference it by name)
+-}
 type HoistedKind
     = HoistUnit (List UnitVariant)
     | HoistDiscriminated { discriminator : String, variants : Dict String Ast.Value }
     | HoistEnumRecordValue Ast.Value
 
 
-{-| one collected union awaiting a name, from the pre-pass walk -}
+{-| one collected union awaiting a name, from the pre-pass walk
+-}
 type alias Collected =
     { key : String, suggested : String, kind : HoistedKind }
 
 
 {-| canonical structural identity for any AST value, used to key (and dedupe) unions.
-mirrors the constructors of Ast.Value -}
+mirrors the constructors of Ast.Value
+-}
 valueKey : Ast.Value -> String
 valueKey value =
     case value of
@@ -380,19 +392,22 @@ valueKey value =
             "unimpl:" ++ s
 
 
-{-| structural key for a unit union -}
+{-| structural key for a unit union
+-}
 unitKey : List UnitVariant -> String
 unitKey units =
     "u|" ++ structuralKey units
 
 
-{-| structural key for a discriminated union -}
+{-| structural key for a discriminated union
+-}
 discriminatedKey : { discriminator : String, variants : Dict String Ast.Value } -> String
 discriminatedKey du =
     valueKey (SDiscriminatedUnion du)
 
 
-{-| canonical structural identity for a unit union, independent of where it appears -}
+{-| canonical structural identity for a unit union, independent of where it appears
+-}
 structuralKey : List UnitVariant -> String
 structuralKey units =
     units
@@ -421,7 +436,8 @@ structuralKey units =
         |> String.join "|"
 
 
-{-| look up the hoisted type for a raw union variant dict, if it classifies as a unit union -}
+{-| look up the hoisted type for a raw union variant dict, if it classifies as a unit union
+-}
 lookupUnion : UnionTable -> Dict String (List Ast.Value) -> Maybe UnionInfo
 lookupUnion table rawVariants =
     case toUnitUnion rawVariants of
@@ -432,7 +448,8 @@ lookupUnion table rawVariants =
             Nothing
 
 
-{-| look up the hoisted type for a discriminated union -}
+{-| look up the hoisted type for a discriminated union
+-}
 lookupDiscriminated : UnionTable -> { discriminator : String, variants : Dict String Ast.Value } -> Maybe UnionInfo
 lookupDiscriminated table du =
     Dict.get (discriminatedKey du) table
@@ -440,7 +457,8 @@ lookupDiscriminated table du =
 
 {-| an enum record's value type, with a `.optional()` wrapper stripped off: the optionality
 belongs to the KEYS of the inlined record (each field becomes a `Maybe`), so the hoisted
-alias describes the present value -}
+alias describes the present value
+-}
 enumRecordValue : Ast.Value -> { optional : Bool, value : Ast.Value }
 enumRecordValue inner =
     case inner of
@@ -451,14 +469,16 @@ enumRecordValue inner =
             { optional = False, value = inner }
 
 
-{-| structural key for an enum record's (unwrapped) value type -}
+{-| structural key for an enum record's (unwrapped) value type
+-}
 enumRecordKey : Ast.Value -> String
 enumRecordKey value =
     "erv|" ++ valueKey value
 
 
 {-| look up the hoisted alias for an enum record's value type, alongside whether the raw
-value type was optional (and so must be re-wrapped in `Maybe` at each inlined field) -}
+value type was optional (and so must be re-wrapped in `Maybe` at each inlined field)
+-}
 lookupEnumRecordValue : UnionTable -> Ast.Value -> Maybe ( UnionInfo, Bool )
 lookupEnumRecordValue table inner =
     let
@@ -578,10 +598,18 @@ buildUnionTable collected =
         |> Tuple.first
 
 
-{-| the name of a union's generated decoder declaration, e.g. `Group` -> `groupDecoder` -}
+{-| the name of a union's generated decoder declaration, e.g. `Group` -> `groupDecoder`
+-}
 decoderName : String -> String
 decoderName typeName =
     String.Ext.toValidIdentifier typeName ++ "Decoder"
+
+
+{-| the name of a union's generated encoder declaration, e.g. `Group` -> `groupEncoder`
+-}
+encoderName : String -> String
+encoderName typeName =
+    String.Ext.toValidIdentifier typeName ++ "Encoder"
 
 
 {-| Elm custom-type constructors share the module namespace, so two hoisted unions in the
@@ -594,17 +622,20 @@ variantCtor prefix u =
     prefix ++ u.ctor
 
 
-{-| the `type X = ...` declaration for a unit union -}
+{-| the `type X = ...` declaration for a unit union
+-}
 unionTypeDecl : String -> String -> List UnitVariant -> Elm.Declaration
 unionTypeDecl name prefix units =
     Elm.customType name (List.map (\u -> Elm.variant (variantCtor prefix u)) units)
 
 
-{-| hoist every collected nested union to a top-level type + decoder declaration, grouped
-so the file can put all types first and all decoders last. Hoisted unions prefix their
-constructors with the type name to avoid cross-type collisions. a declaration whose type
-maps but whose decoder can't yet be built keeps the type alone. -}
-hoistedUnionDecls : UnionTable -> { types : List Elm.Declaration, decoders : List Elm.Declaration }
+{-| hoist every collected nested union to a top-level type + decoder + encoder declaration,
+grouped so the file can put all types first, all decoders next, and all encoders last.
+Hoisted unions prefix their constructors with the type name to avoid cross-type collisions.
+a declaration whose type maps but whose decoder/encoder can't yet be built keeps whatever
+subset does.
+-}
+hoistedUnionDecls : UnionTable -> { types : List Elm.Declaration, decoders : List Elm.Declaration, encoders : List Elm.Declaration }
 hoistedUnionDecls table =
     Dict.values table
         |> List.map
@@ -619,6 +650,7 @@ hoistedUnionDecls table =
 
                                 Err _ ->
                                     []
+                        , encoders = [ Elm.declaration (encoderName name) (unitUnionEncoder name name units) ]
                         }
 
                     HoistDiscriminated du ->
@@ -632,10 +664,17 @@ hoistedUnionDecls table =
 
                                         Err _ ->
                                             []
+                                , encoders =
+                                    case discriminatedUnionEncoder table name name du of
+                                        Ok enc ->
+                                            [ Elm.declaration (encoderName name) enc ]
+
+                                        Err _ ->
+                                            []
                                 }
 
                             Err _ ->
-                                { types = [], decoders = [] }
+                                { types = [], decoders = [], encoders = [] }
 
                     HoistEnumRecordValue value ->
                         case Ast.optPara (typeAnnotationAttrs table) value of
@@ -650,14 +689,24 @@ hoistedUnionDecls table =
 
                                         Nothing ->
                                             []
+                                , encoders =
+                                    case Ast.optPara (encoderExprAttrs table) value of
+                                        Just node ->
+                                            [ Elm.declaration (encoderName name) <|
+                                                Elm.withType (Type.function [ Type.named [] name ] jsonValueAnn) node.encoder
+                                            ]
+
+                                        Nothing ->
+                                            []
                                 }
 
                             Nothing ->
-                                { types = [], decoders = [] }
+                                { types = [], decoders = [], encoders = [] }
             )
         |> (\groups ->
                 { types = List.concatMap .types groups
                 , decoders = List.concatMap .decoders groups
+                , encoders = List.concatMap .encoders groups
                 }
            )
 
@@ -668,7 +717,8 @@ hoistedUnionDecls table =
 -- unit unions these become `variantWith` constructors and a discriminant-matching decoder.
 
 
-{-| `type Value = User { ... } | PrivilegedUser { ... }` from a discriminated union -}
+{-| `type Value = User { ... } | PrivilegedUser { ... }` from a discriminated union
+-}
 discriminatedUnionTypeDecl : UnionTable -> String -> String -> { discriminator : String, variants : Dict String Ast.Value } -> Result String Elm.Declaration
 discriminatedUnionTypeDecl table typeName prefix du =
     du.variants
@@ -683,7 +733,8 @@ discriminatedUnionTypeDecl table typeName prefix du =
         |> Result.map (Elm.customType typeName)
 
 
-{-| `D.field "tag" D.string |> D.andThen (\t -> case t of "user" -> D.map User userDecoder ...)` -}
+{-| `D.field "tag" D.string |> D.andThen (\t -> case t of "user" -> D.map User userDecoder ...)`
+-}
 discriminatedUnionDecoder : UnionTable -> String -> String -> { discriminator : String, variants : Dict String Ast.Value } -> Result String Elm.Expression
 discriminatedUnionDecoder table typeName prefix du =
     du.variants
@@ -714,7 +765,8 @@ discriminatedUnionDecoder table typeName prefix du =
             )
 
 
-{-| constructor name for a discriminated variant, from its discriminant wire value -}
+{-| constructor name for a discriminated variant, from its discriminant wire value
+-}
 discriminantCtor : String -> String -> String
 discriminantCtor prefix wire =
     prefix ++ String.Ext.toTypename wire
@@ -1059,3 +1111,374 @@ toObjectDecoder fields =
     Elm.withType (Type.named [] "Json.Decode.Decoder Value") <|
         -- D.succeed ctor |> Dx.andMap decoder1 |> Dx.andMap decoder2 ...
         pipeline (GD.succeed ctor) fieldDecoders
+
+
+
+-- ENCODERS
+-- each node built here carries a function `a -> Json.Encode.Value` for the type generated
+-- at the same AST node, chosen so that `D.decodeValue decoder (encoder v) == Ok v`
+
+
+{-| `Json.Encode.Value`, for pinning `encoder : Value -> Json.Encode.Value` annotations
+-}
+jsonValueAnn : Type.Annotation
+jsonValueAnn =
+    Type.namedWith [ "Json", "Encode" ] "Value" []
+
+
+{-| an encoder expression plus the height of its AST node. Elm rejects shadowed names,
+and encoder generation nests lambdas (object in object, maybe in object, ...), so every
+generated binder is suffixed with its node's height — an ancestor's height is strictly
+greater than any descendant's, so nested binders can never collide.
+-}
+type alias EncoderNode =
+    { height : Int, encoder : Elm.Expression }
+
+
+{-| a leaf encoder: no lambdas of its own, so height 0
+-}
+leafEnc : Elm.Expression -> EncoderNode
+leafEnc expr =
+    { height = 0, encoder = expr }
+
+
+{-| a one-child wrapper that introduces no binder of its own (list/set/dict)
+-}
+wrapEnc : (Elm.Expression -> Elm.Expression) -> EncoderNode -> EncoderNode
+wrapEnc fn node =
+    { height = node.height + 1, encoder = fn node.encoder }
+
+
+{-| binder name for a node of the given height, e.g. `value3`
+-}
+binder : String -> Int -> String
+binder base height =
+    base ++ String.fromInt height
+
+
+encoderExprAttrs : UnionTable -> List (Ast.Attr EncoderNode)
+encoderExprAttrs table =
+    [ -- leaves
+      Ast.onString (leafEnc GE.values_.string)
+    , Ast.onInt (leafEnc GE.values_.int)
+    , Ast.onFloat (leafEnc GE.values_.float)
+    , Ast.onBool (leafEnc GE.values_.bool)
+
+    -- Any/Unknown are already `Json.Encode.Value`
+    , Ast.onAny (leafEnc Gen.Basics.values_.identity)
+    , Ast.onUnknown (leafEnc Gen.Basics.values_.identity)
+
+    -- the phantom leaves all encode to `null`, which their decoders accept
+    , Ast.onVoid (leafEnc Gen.Javascript.values_.voidEncoder)
+    , Ast.onUndefined (leafEnc Gen.Javascript.values_.undefinedEncoder)
+    , Ast.onNull (leafEnc Gen.Javascript.values_.nullEncoder)
+    , Ast.onNaN (leafEnc Gen.Javascript.values_.nanEncoder)
+    , Ast.onBigInt (leafEnc Gen.BigInt.Ext.values_.encoder)
+    , Ast.onUrl (leafEnc Gen.Url.Ext.values_.encoder)
+    , Ast.onDateTime (leafEnc Gen.Iso8601.values_.encode)
+    , Ast.onIsoDate (leafEnc Gen.Date.Ext.values_.encoder)
+    , Ast.onIsoTime (leafEnc Gen.Hour.Ext.values_.encoder)
+
+    -- nodes
+    , Ast.onNullableOrOptionalFlat
+        (\node ->
+            let
+                height =
+                    node.height + 1
+            in
+            { height = height
+            , encoder =
+                Elm.fn (Elm.Arg.var (binder "maybeValue" height))
+                    (\maybeValue ->
+                        Elm.Case.maybe maybeValue
+                            { nothing = GE.null
+                            , just = ( binder "just" height, \just -> Elm.apply node.encoder [ just ] )
+                            }
+                    )
+            }
+        )
+    , Ast.onArray (\_ -> Maybe.map (wrapEnc (\enc -> Elm.apply GE.values_.list [ enc ])))
+    , Ast.onTuple (\_ items -> sequenceMaybes items |> Maybe.andThen tupleEncoder)
+    , Ast.onSet
+        (\inner ->
+            if isComparable inner then
+                Maybe.map (wrapEnc (\enc -> Elm.apply GE.values_.set [ enc ]))
+
+            else
+                always Nothing
+        )
+    , Ast.onRecord (\_ -> Maybe.map (wrapEnc (\enc -> Elm.apply GE.values_.dict [ Gen.Basics.values_.identity, enc ])))
+    , Ast.onEnumRecord
+        (\keys inner _ ->
+            lookupEnumRecordValue table inner
+                |> Maybe.map (\( info, optional ) -> enumRecordEncoder keys optional info)
+        )
+    , Ast.onObject
+        (\_ dictOfMaybeEncoders ->
+            dictOfMaybeEncoders
+                |> Dict.toList
+                |> List.foldr
+                    (\( fieldName, maybeEncoder ) acc ->
+                        Maybe.map2
+                            (\encoder rest -> ( fieldName, encoder ) :: rest)
+                            maybeEncoder
+                            acc
+                    )
+                    (Just [])
+                |> Maybe.map toObjectEncoder
+        )
+
+    -- a nested unit-variant union encodes via a reference to its hoisted encoder
+    , Ast.onUnion
+        (\rawVariants _ ->
+            lookupUnion table rawVariants
+                |> Maybe.map (\info -> leafEnc (Elm.val (encoderName info.name)))
+        )
+    , Ast.onDiscriminatedUnion
+        (\du _ ->
+            lookupDiscriminated table du
+                |> Maybe.map (\info -> leafEnc (Elm.val (encoderName info.name)))
+        )
+    ]
+
+
+toEncoderDecl : UnionTable -> Ast.Value -> Result String Elm.Declaration
+toEncoderDecl table value =
+    case value of
+        SUnion variants ->
+            toUnitUnion variants
+                |> Result.map (unitUnionEncoder "Value" "")
+                |> Result.map (Elm.declaration "encoder")
+
+        SDiscriminatedUnion du ->
+            discriminatedUnionEncoder table "Value" "" du
+                |> Result.map (Elm.declaration "encoder")
+
+        _ ->
+            value
+                |> Ast.optPara (encoderExprAttrs table)
+                |> Result.fromMaybe "Could not create a valid encoder for this type"
+                |> Result.map .encoder
+                |> Result.map (Elm.withType (Type.function [ Type.named [] "Value" ] jsonValueAnn))
+                |> Result.map (Elm.declaration "encoder")
+
+
+{-| `\valueN -> E.object [ ( "f1", enc1 valueN.f1 ), ... ]`. the WIRE key stays raw; the
+record access uses the sanitized Elm field name, mirroring the type-side sanitization in
+typeAnnotationAttrs' onObject.
+-}
+toObjectEncoder : List ( String, EncoderNode ) -> EncoderNode
+toObjectEncoder fields =
+    let
+        height =
+            1 + List.foldl (\( _, node ) acc -> max node.height acc) 0 fields
+    in
+    { height = height
+    , encoder =
+        Elm.fn (Elm.Arg.var (binder "value" height))
+            (\value ->
+                GE.object
+                    (List.map
+                        (\( fieldName, node ) ->
+                            Elm.tuple (Elm.string fieldName) (Elm.apply node.encoder [ Elm.get (String.Ext.toValidIdentifier fieldName) value ])
+                        )
+                        fields
+                    )
+            )
+    }
+
+
+{-| encoder for an enum-keyed record: one wire field per enum key, each encoding via the
+hoisted value-type encoder. an optional value type means each field is a `Maybe`; `Nothing`
+encodes as an explicit `null`, which the paired decoder reads back as `Nothing`.
+-}
+enumRecordEncoder : List String -> Bool -> UnionInfo -> EncoderNode
+enumRecordEncoder keys optional info =
+    let
+        valueEncoder =
+            Elm.val (encoderName info.name)
+
+        -- the hoisted encoder reference is a leaf; the optional wrapper adds a maybe-case
+        height =
+            if optional then
+                2
+
+            else
+                1
+
+        fieldValue value key =
+            let
+                accessed =
+                    Elm.get (String.Ext.toValidIdentifier key) value
+            in
+            if optional then
+                Elm.Case.maybe accessed
+                    { nothing = GE.null
+                    , just = ( binder "just" height, \just -> Elm.apply valueEncoder [ just ] )
+                    }
+
+            else
+                Elm.apply valueEncoder [ accessed ]
+    in
+    { height = height
+    , encoder =
+        Elm.fn (Elm.Arg.var (binder "value" height))
+            (\value ->
+                GE.object (List.map (\key -> Elm.tuple (Elm.string key) (fieldValue value key)) keys)
+            )
+    }
+
+
+{-| the tuple decoder reads a flat JSON array by position (`D.index i`), so the encoder
+flattens the Elm shape — `( a, b )`, `( a, b, c )`, or right-nested pairs for 4+ — back
+into `E.list identity [ ... ]` in slot order
+-}
+tupleEncoder : List EncoderNode -> Maybe EncoderNode
+tupleEncoder nodes =
+    let
+        height =
+            1 + List.foldl (\node acc -> max node.height acc) 0 nodes
+
+        encodeAll : List EncoderNode -> List Elm.Expression -> Elm.Expression
+        encodeAll encs vals =
+            GE.call_.list Gen.Basics.values_.identity
+                (Elm.list (List.map2 (\node v -> Elm.apply node.encoder [ v ]) encs vals))
+
+        wrap : Elm.Expression -> EncoderNode
+        wrap expr =
+            { height = height, encoder = expr }
+    in
+    case nodes of
+        [] ->
+            Nothing
+
+        [ ea, eb ] ->
+            Just <|
+                wrap <|
+                    Elm.fn (Elm.Arg.tuple (Elm.Arg.var (binder "first" height)) (Elm.Arg.var (binder "second" height)))
+                        (\( a, b ) -> encodeAll [ ea, eb ] [ a, b ])
+
+        [ ea, eb, ec ] ->
+            Just <|
+                wrap <|
+                    Elm.fn (Elm.Arg.triple (Elm.Arg.var (binder "first" height)) (Elm.Arg.var (binder "second" height)) (Elm.Arg.var (binder "third" height)))
+                        (\( a, b, c ) -> encodeAll [ ea, eb, ec ] [ a, b, c ])
+
+        _ ->
+            -- 1 element (a bare value at index 0) or 4+ (right-nested pairs); project slot i
+            -- as `Tuple.first (Tuple.second^i value)`, with the final slot just `Tuple.second^i`
+            let
+                n =
+                    List.length nodes
+            in
+            Just <|
+                wrap <|
+                    Elm.fn (Elm.Arg.var (binder "value" height))
+                        (\value ->
+                            let
+                                descend : Int -> Elm.Expression -> Elm.Expression
+                                descend k expr =
+                                    if k <= 0 then
+                                        expr
+
+                                    else
+                                        descend (k - 1) (Gen.Tuple.second expr)
+
+                                proj : Int -> Elm.Expression
+                                proj i =
+                                    if i == n - 1 then
+                                        descend i value
+
+                                    else
+                                        Gen.Tuple.first (descend i value)
+                            in
+                            encodeAll nodes (List.map proj (List.range 0 (n - 1)))
+                        )
+
+
+{-| `WireString "a"` -> `Json.Encode.string "a"`, etc.
+-}
+wireEncoder : WireValue -> Elm.Expression
+wireEncoder wire =
+    case wire of
+        WireString s ->
+            GE.string s
+
+        WireInt i ->
+            GE.int i
+
+        WireBool b ->
+            GE.bool b
+
+
+{-| `\value -> case value of Ctor1 -> E.string "wire1" ...` — the inverse of
+`unitUnionDecoder`. Unlike the decoder, this can't fail: every variant's wire value
+encodes directly, and mixed-wire unions are fine on the way out.
+-}
+unitUnionEncoder : String -> String -> List UnitVariant -> Elm.Expression
+unitUnionEncoder typeName prefix units =
+    Elm.withType (Type.function [ Type.named [] typeName ] jsonValueAnn) <|
+        Elm.fn (Elm.Arg.var "value")
+            (\value ->
+                Elm.Case.custom value
+                    (Type.named [] typeName)
+                    (List.map
+                        (\u ->
+                            Elm.Case.branch (Elm.Arg.customType (variantCtor prefix u) ())
+                                (\_ -> wireEncoder u.wire)
+                        )
+                        units
+                    )
+            )
+
+
+{-| `\value -> case value of User payload -> E.object (( "tag", E.string "user" ) :: payload fields)` —
+re-injects the discriminator the AST stripped, alongside the payload's fields, so the
+discriminant-matching decoder roundtrips it.
+-}
+discriminatedUnionEncoder : UnionTable -> String -> String -> { discriminator : String, variants : Dict String Ast.Value } -> Result String Elm.Expression
+discriminatedUnionEncoder table typeName prefix du =
+    du.variants
+        |> Dict.toList
+        |> List.map
+            (\( wire, payload ) ->
+                (case payload of
+                    SObject shape ->
+                        shape
+                            |> Dict.toList
+                            |> List.map
+                                (\( fieldName, fieldValue ) ->
+                                    Ast.optPara (encoderExprAttrs table) fieldValue
+                                        |> Maybe.map (\node -> ( fieldName, node.encoder ))
+                                )
+                            |> sequenceMaybes
+
+                    _ ->
+                        Nothing
+                )
+                    |> Result.fromMaybe ("Could not build encoder for discriminated variant: " ++ wire)
+                    |> Result.map
+                        (\fieldEncoders ->
+                            Elm.Case.branch
+                                (Elm.Arg.customType (discriminantCtor prefix wire) identity
+                                    |> Elm.Arg.item (Elm.Arg.var "payload")
+                                )
+                                (\payloadExpr ->
+                                    GE.object
+                                        (Elm.tuple (Elm.string du.discriminator) (GE.string wire)
+                                            :: List.map
+                                                (\( fieldName, enc ) ->
+                                                    Elm.tuple (Elm.string fieldName) (Elm.apply enc [ Elm.get (String.Ext.toValidIdentifier fieldName) payloadExpr ])
+                                                )
+                                                fieldEncoders
+                                        )
+                                )
+                        )
+            )
+        |> List.foldr (Result.map2 (::)) (Ok [])
+        |> Result.map
+            (\branches ->
+                Elm.withType (Type.function [ Type.named [] typeName ] jsonValueAnn) <|
+                    Elm.fn (Elm.Arg.var "value")
+                        (\value -> Elm.Case.custom value (Type.named [] typeName) branches)
+            )

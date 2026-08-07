@@ -1,9 +1,11 @@
-module Gen.Url.Ext exposing ( moduleName_, decoder, values_ )
+module Gen.Url.Ext exposing
+    ( moduleName_, decoder, encoder, call_, values_
+    )
 
 {-|
 # Generated bindings for Url.Ext
 
-@docs moduleName_, decoder, values_
+@docs moduleName_, decoder, encoder, call_, values_
 -}
 
 
@@ -33,7 +35,49 @@ decoder =
         }
 
 
-values_ : { decoder : Elm.Expression }
+{-| encoder: Url.Url -> Json.Encode.Value -}
+encoder : Elm.Expression -> Elm.Expression
+encoder encoderArg_ =
+    Elm.apply
+        (Elm.value
+             { importFrom = [ "Url", "Ext" ]
+             , name = "encoder"
+             , annotation =
+                 Just
+                     (Type.function
+                          [ Type.namedWith [ "Url" ] "Url" [] ]
+                          (Type.namedWith [ "Json", "Encode" ] "Value" [])
+                     )
+             }
+        )
+        [ encoderArg_ ]
+
+
+call_ : { encoder : Elm.Expression -> Elm.Expression }
+call_ =
+    { encoder =
+        \encoderArg_ ->
+            Elm.apply
+                (Elm.value
+                     { importFrom = [ "Url", "Ext" ]
+                     , name = "encoder"
+                     , annotation =
+                         Just
+                             (Type.function
+                                  [ Type.namedWith [ "Url" ] "Url" [] ]
+                                  (Type.namedWith
+                                       [ "Json", "Encode" ]
+                                       "Value"
+                                       []
+                                  )
+                             )
+                     }
+                )
+                [ encoderArg_ ]
+    }
+
+
+values_ : { decoder : Elm.Expression, encoder : Elm.Expression }
 values_ =
     { decoder =
         Elm.value
@@ -45,6 +89,17 @@ values_ =
                          [ "Json", "Decode" ]
                          "Decoder"
                          [ Type.namedWith [ "Url" ] "Url" [] ]
+                    )
+            }
+    , encoder =
+        Elm.value
+            { importFrom = [ "Url", "Ext" ]
+            , name = "encoder"
+            , annotation =
+                Just
+                    (Type.function
+                         [ Type.namedWith [ "Url" ] "Url" [] ]
+                         (Type.namedWith [ "Json", "Encode" ] "Value" [])
                     )
             }
     }

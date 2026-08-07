@@ -2,8 +2,16 @@ module BigInt.Ext exposing (..)
 
 import BigInt exposing (BigInt)
 import Json.Decode as D exposing (Decoder)
+import Json.Encode as E
 import Maybe.Extra
 import S
+
+
+{-| decimal string, which `decoder` accepts via `BigInt.fromIntString`
+-}
+encoder : BigInt -> E.Value
+encoder =
+    E.string << BigInt.toString
 
 
 decoder : Decoder BigInt
