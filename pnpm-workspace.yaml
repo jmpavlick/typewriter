@@ -1,4 +1,4 @@
-onlyBuiltDependencies:
-  - elm
-  - elm-test-rs
-  - esbuild
+allowBuilds:
+  elm: true
+  elm-test-rs: true
+  esbuild: true
