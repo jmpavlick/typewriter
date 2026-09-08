@@ -16,7 +16,7 @@
     "test:watch": "concurrently \"pnpm test:elm:watch\" \"pnpm test:ts:watch\"",
     "typecheck:ts": "tsc --noEmit"
   },
-  "packageManager": "pnpm@11.7.0",
+  "packageManager": "pnpm@11.17.0",
   "devDependencies": {
     "@types/node": "^25.1.0",
     "chokidar": "^5.0.0",
