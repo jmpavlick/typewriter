@@ -5,6 +5,12 @@ import { fileURLToPath } from "url"
 export const readFile = (filePath: string, encoding: BufferEncoding = "utf-8"): Promise<string> =>
   fs.promises.readFile(filePath, encoding)
 
+export const exists = (filePath: string): Promise<boolean> =>
+  fs.promises.access(filePath).then(
+    () => true,
+    () => false
+  )
+
 export const rm = (filePath: string, options?: fs.RmOptions): Promise<void> =>
   fs.promises.rm(filePath, options)
 

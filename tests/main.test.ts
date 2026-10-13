@@ -4,7 +4,7 @@ import z from "zod"
 import * as path from "path"
 import { fileURLToPath } from "url"
 import { type ConfigParams, packageRoot, toConfig } from "../src/config.js"
-import { toRunPropsEntries, toSerializable } from "../src/main.js"
+import { toElmModuleSegment, toRunPropsEntries, toSerializable } from "../src/main.js"
 import ouroboros from "../src/ouroboros.js"
 
 // the package root, derived the same way config.ts derives it — tests/ → ..
@@ -137,3 +137,17 @@ test("ouroboros plans absolute, package-rooted paths so runAll is cwd-independen
     )
   }
 })
+
+// must agree with Builder.elm's `String.Extra.camelize >> toTitleCase`, or a generated module reads as missing
+for (const [input, expected] of [
+  ["storePageProjection", "StorePageProjection"],
+  ["StorePageProjection", "StorePageProjection"],
+  ["store_page_projection", "StorePageProjection"],
+  ["store-page", "StorePage"],
+  ["trailing_", "Trailing"],
+  ["v2Thing", "V2Thing"],
+] as const) {
+  test(`toElmModuleSegment(${JSON.stringify(input)}) === ${JSON.stringify(expected)}`, () => {
+    assert.equal(toElmModuleSegment(input), expected)
+  })
+}
