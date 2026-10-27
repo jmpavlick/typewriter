@@ -10,6 +10,6 @@
     "rootDir": "."
   },
   "include": ["src/**/*", "lib/**/*", "index.ts"],
-  "files": ["tests/corpus.config.ts"],
+  "files": ["tests/corpus.config.ts", "tests/importedVariants.ts", "tests/importingVariants.ts", "tests/defaultExport.ts"],
   "exclude": ["node_modules", "dist", "generated", "tests", "templates"]
 }

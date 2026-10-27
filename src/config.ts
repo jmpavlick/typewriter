@@ -1,4 +1,3 @@
-import z from "zod"
 import * as path from "path"
 import { fileURLToPath } from "url"
 import * as ElmCodegen from "../lib/elmCodegen.js"
@@ -9,49 +8,46 @@ import * as ElmCodegen from "../lib/elmCodegen.js"
 // schemas) — still find the generator. `src/config.ts` → `..` is the package root.
 export const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
+/** reference another config's generated modules instead of regenerating them: each named export
+ * of `from` (its module name, e.g. `Locale`) whose structure matches a nested type in this section
+ * is referenced as `Locale.Value` — imported, not hoisted. only types typewriter hoists can match:
+ * enums/literal unions, discriminated unions, and enum-keyed records' value types. */
+export type ConfigImport = {
+  from: Config
+  names: string[]
+}
+
 /** one section: generate every zod export of each input file into `relativeOutdir`, under
  * `outputModuleNamespace` */
-const configParamsSection = z.object({
-  relativeInputPaths: z.array(z.string()),
-  relativeOutdir: z.string(),
-  outputModuleNamespace: z.array(z.string()).optional(),
-  elmCodegenOverrides: ElmCodegen.config.pick({ generatorModulePath: true, debug: true }).partial().optional(),
-})
+export type ConfigSection = {
+  relativeInputPaths: string[]
+  relativeOutdir: string
+  outputModuleNamespace?: string[]
+  imports?: ConfigImport[]
+  elmCodegenOverrides?: Partial<Pick<ElmCodegen.Config, "generatorModulePath" | "debug">>
+}
 
 /** what a caller writes; `toConfig` fills in the rest */
-export const configParams = z.object({
-  root: z.optional(z.string()),
-  sections: z.record(z.string(), configParamsSection),
-})
-export type ConfigParams = z.infer<typeof configParams>
+export type ConfigParams = {
+  root?: string
+  sections: Record<string, ConfigSection>
+}
 
-export const config = z.object({
-  workdirPath: z.string(),
-  ...configParams.required({ root: true }).shape,
-  elmCodegenConfig: ElmCodegen.config,
-})
-export type Config = z.infer<typeof config>
+export type Config = Required<ConfigParams> & {
+  workdirPath: string
+  elmCodegenConfig: ElmCodegen.Config
+}
 
-export const toConfig = ({
-  root: maybeRoot,
+export const toConfig = ({ root = ".", sections }: ConfigParams): Config => ({
+  root,
+  workdirPath: path.join(root, ".typewriter"),
   sections,
-}: ConfigParams): Config => {
-  const root = maybeRoot ?? "."
-  const workdirPath = path.join(root, ".typewriter")
-
-  const elmCodegenConfig: ElmCodegen.Config = {
+  elmCodegenConfig: {
     // elm-codegen's `debug: false` compiles the generator with --optimize, which rejects the
     // generator's `Debug.log`s — so the generator only builds in debug mode
     debug: true,
     cwd: path.join(packageRoot, "codegen"),
     generatorModulePath: "GenerateZodBindings.elm",
     outdir: "generated",
-  }
-
-  return {
-    root,
-    workdirPath,
-    sections,
-    elmCodegenConfig,
-  }
-}
+  },
+})

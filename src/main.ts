@@ -5,7 +5,7 @@ import { execFile } from "child_process"
 import { promisify } from "util"
 import * as Astify from "./astify.js"
 import * as fs from "../lib/fs.js"
-import { type Config } from "./config.js"
+import { type Config, type ConfigImport } from "./config.js"
 
 /**
  * Astify hands back live Zod schema instances. Consumers may decorate those instances
@@ -101,8 +101,43 @@ export const runProps = z.object({
   elmCodegenConfig: ElmCodegen.config,
   zodAstOutputPath: z.string(),
   manifestPath: z.string(),
+  imports: z.array(z.custom<ConfigImport>()),
 })
 export type RunProps = z.infer<typeof runProps>
+
+/** what the generator gets per import: the module the export was generated into, and its zod */
+type ResolvedImport = { moduleName: string[]; value: unknown }
+
+/** find each imported name among the exports of the imported config's inputs. a name must match
+ * exactly one export across that config's sections. */
+const resolveImports = async (imports: ConfigImport[]): Promise<ResolvedImport[]> =>
+  (
+    await Promise.all(
+      imports.map(async ({ from, names }) => {
+        const exported = (
+          await Promise.all(
+            toRunPropsEntries(from).map(async ({ inputPath, outputModuleNamespace }) =>
+              Object.entries(await Astify.execute(inputPath)).map(([name, schema]) => ({
+                name,
+                moduleName: [...outputModuleNamespace, name].map(toElmModuleSegment),
+                schema,
+              }))
+            )
+          )
+        ).flat()
+
+        return names.map((name) => {
+          const matches = exported.filter((e) => e.name === name)
+          if (matches.length !== 1) {
+            throw new Error(
+              `typewriter: import "${name}" matched ${matches.length} exports of the imported config (need exactly 1)`
+            )
+          }
+          return { moduleName: matches[0].moduleName, value: toSerializable(matches[0].schema) }
+        })
+      })
+    )
+  ).flat()
 
 /** the files one run (section × input path) wrote, as absolute paths. outdirs are shared — other
  * sections, other configs, and hand-written modules can live beside ours — so the next run deletes
@@ -127,6 +162,7 @@ export const run = async ({
   zodAstOutputPath,
   manifestPath,
   outputModuleNamespace,
+  imports,
 }: RunProps): Promise<void> => {
   const errorModulePath = path.resolve(
     elmCodegenConfig.outdir,
@@ -137,6 +173,8 @@ export const run = async ({
   console.log(`section: ${label}\ninput: ${inputPath}`)
 
   const decls = await Astify.execute(inputPath)
+  // before any cleanup: a bad import name fails the run without deleting anything
+  const resolvedImports = await resolveImports(imports)
   const modulePaths = Object.keys(decls).map(
     (name) =>
       path.resolve(
@@ -168,7 +206,11 @@ export const run = async ({
     mkdirP: true,
   })
 
-  await ElmCodegen.execute(elmCodegenConfig)({ outputModuleNamespace, decls: serializableDecls })
+  await ElmCodegen.execute(elmCodegenConfig)({
+    outputModuleNamespace,
+    decls: serializableDecls,
+    imports: resolvedImports,
+  })
   await assertNoErrorModule(errorModulePath, label)
   await assertModulesGenerated(modulePaths, label)
 }
@@ -187,7 +229,7 @@ export const toRunPropsEntries = ({
 
   const fromSection = ([
     label,
-    { relativeInputPaths, relativeOutdir, elmCodegenOverrides, outputModuleNamespace },
+    { relativeInputPaths, relativeOutdir, elmCodegenOverrides, outputModuleNamespace, imports },
   ]: [string, Config["sections"][number]]): RunProps[] => {
     const elmCodegenConfig: ElmCodegen.Config = {
       ...globalElmCodegenConfig,
@@ -207,6 +249,7 @@ export const toRunPropsEntries = ({
         elmCodegenConfig,
         zodAstOutputPath: `${runWorkdir}.json`,
         manifestPath: `${runWorkdir}.manifest.json`,
+        imports: imports ?? [],
       }
     })
   }

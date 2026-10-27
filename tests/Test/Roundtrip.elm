@@ -21,6 +21,7 @@ import IntegrationTests.EnumRecordInObject
 import IntegrationTests.EnumRecordRequiredValues
 import IntegrationTests.EnumRecordToplevel
 import IntegrationTests.HttpStatus
+import IntegrationTests.ImportingPage
 import IntegrationTests.InferredKindUnion
 import IntegrationTests.IntSet
 import IntegrationTests.IsoDate
@@ -35,6 +36,8 @@ import IntegrationTests.PartialEnumRecordInObject
 import IntegrationTests.QuintTuple
 import IntegrationTests.RecordInObject
 import IntegrationTests.SetInObject
+import IntegrationTests.SharedChannel
+import IntegrationTests.SharedLocale
 import IntegrationTests.SimpleUser
 import IntegrationTests.StringMap
 import IntegrationTests.StringNativeEnum
@@ -158,6 +161,20 @@ suite =
                         , group = IntegrationTests.User.GroupAdmin
                         }
                 , signedUpAt = Time.millisToPosix 1600000000000
+                }
+            ]
+        , describe "imported types"
+            [ law "nested types referenced from another config's modules"
+                IntegrationTests.ImportingPage.encoder
+                IntegrationTests.ImportingPage.decoder
+                { alternates = [ { locale = IntegrationTests.SharedLocale.FrCA, urlSlug = "fr" } ]
+                , channel = IntegrationTests.SharedChannel.Sms { phone = "555" }
+                , locale = IntegrationTests.SharedLocale.EnUS
+                , other = IntegrationTests.ImportingPage.OtherY
+                , slots =
+                    { closet = { label = "closet", priority = 1 }
+                    , parking = { label = "parking", priority = 2 }
+                    }
                 }
             ]
         , describe "vendored extensions"

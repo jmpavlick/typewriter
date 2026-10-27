@@ -36,12 +36,15 @@ import String.Extra
 -- BUILD AN ELM FILE (or don't)
 
 
-build : List String -> Ast.Decl -> ( ( String, List String ), Maybe Elm.File )
-build path ( moduleName, typedef ) =
+build : List Import -> List String -> Ast.Decl -> ( ( String, List String ), Maybe Elm.File )
+build imports path ( moduleName, typedef ) =
     let
         -- pre-pass: name every nested unit-variant union so the traversal can reference it
         -- and so we can hoist its declarations to the top of the module. a root-level union
         -- becomes `Value` itself and is handled separately, so we skip the table for it.
+        seed =
+            importTable imports
+
         table : UnionTable
         table =
             case typedef of
@@ -51,13 +54,13 @@ build path ( moduleName, typedef ) =
                 SDiscriminatedUnion du ->
                     -- the root discriminated union becomes `Value` itself; only hoist unions
                     -- nested inside its payloads
-                    buildUnionTable <|
+                    buildUnionTable seed <|
                         (Dict.toList du.variants
                             |> List.concatMap (\( wire, payload ) -> collectUnions (String.Ext.toTypename wire) payload)
                         )
 
                 _ ->
-                    buildUnionTable <| collectUnions (String.Ext.toTypename moduleName) typedef
+                    buildUnionTable seed <| collectUnions (String.Ext.toTypename moduleName) typedef
 
         ( typeErrs, typeDecls ) =
             List.Ext.partitionMapResult identity [ toTypeDecl table typedef ]
@@ -188,10 +191,10 @@ typeAnnotationAttrs table =
                         let
                             fieldType =
                                 if optional then
-                                    Type.maybe (Type.named [] info.name)
+                                    Type.maybe (infoType info)
 
                                 else
-                                    Type.named [] info.name
+                                    infoType info
                         in
                         Type.record (List.map (\k -> ( String.Ext.toValidIdentifier k, fieldType )) keys)
                     )
@@ -215,12 +218,12 @@ typeAnnotationAttrs table =
     , Ast.onUnion
         (\rawVariants _ ->
             lookupUnion table rawVariants
-                |> Maybe.map (\info -> Type.named [] info.name)
+                |> Maybe.map infoType
         )
     , Ast.onDiscriminatedUnion
         (\du _ ->
             lookupDiscriminated table du
-                |> Maybe.map (\info -> Type.named [] info.name)
+                |> Maybe.map infoType
         )
     ]
 
@@ -273,7 +276,80 @@ type alias UnionTable =
 
 
 type alias UnionInfo =
-    { name : String, kind : HoistedKind }
+    { name : String, kind : HoistedKind, home : Home }
+
+
+{-| where a table entry's declarations live: hoisted into the module being built, or already
+generated as the root `Value` of another module (an import, matched by structural key)
+-}
+type Home
+    = Local
+    | Imported (List String)
+
+
+{-| a root decl from another config, offered for import: any nested type here that's
+structurally identical to its `Value` references it instead of hoisting a copy
+-}
+type alias Import =
+    { moduleName : List String, value : Ast.Value }
+
+
+infoType : UnionInfo -> Type.Annotation
+infoType info =
+    case info.home of
+        Local ->
+            Type.named [] info.name
+
+        Imported moduleName ->
+            Type.named moduleName info.name
+
+
+infoDecoder : UnionInfo -> Elm.Expression
+infoDecoder info =
+    case info.home of
+        Local ->
+            Elm.val (decoderName info.name)
+
+        Imported moduleName ->
+            Elm.value { importFrom = moduleName, name = "decoder", annotation = Nothing }
+
+
+infoEncoder : UnionInfo -> Elm.Expression
+infoEncoder info =
+    case info.home of
+        Local ->
+            Elm.val (encoderName info.name)
+
+        Imported moduleName ->
+            Elm.value { importFrom = moduleName, name = "encoder", annotation = Nothing }
+
+
+{-| seed a union table with imports, keyed exactly as `collectUnions` would key the same value
+nested in a decl — so a structural match is a table hit, and `buildUnionTable` never hoists a
+local copy. a root union/discriminated union is its module's `Value` custom type; any other root
+is a `Value` alias, matchable where an enum record's value type would hoist the same shape.
+-}
+importTable : List Import -> UnionTable
+importTable =
+    List.filterMap
+        (\{ moduleName, value } ->
+            let
+                entry key kind =
+                    Just ( key, { name = "Value", kind = kind, home = Imported moduleName } )
+            in
+            case value of
+                SUnion variants ->
+                    toUnitUnion variants
+                        |> Result.toMaybe
+                        |> Maybe.andThen (\units -> entry (unitKey units) (HoistUnit units))
+
+                SDiscriminatedUnion du ->
+                    entry (discriminatedKey du) (HoistDiscriminated du)
+
+                _ ->
+                    entry (enumRecordKey value) (HoistEnumRecordValue value)
+        )
+        >> Dict.fromList
 
 
 {-| the flavors of hoistable named declaration: a payload-free unit union (z.literal/z.enum),
@@ -556,8 +632,8 @@ collectUnions suggested value =
 {-| assign a unique Elm type name to each distinct structural union. structurally identical
 unions dedupe to one name; distinct unions that want the same name get a numeric suffix.
 -}
-buildUnionTable : List Collected -> UnionTable
-buildUnionTable collected =
+buildUnionTable : UnionTable -> List Collected -> UnionTable
+buildUnionTable seed collected =
     let
         uniquify : String -> Set String -> String
         uniquify base used =
@@ -590,11 +666,11 @@ buildUnionTable collected =
                         name =
                             uniquify suggested used
                     in
-                    ( Dict.insert key { name = name, kind = kind } table
+                    ( Dict.insert key { name = name, kind = kind, home = Local } table
                     , Set.insert name used
                     )
             )
-            ( Dict.empty, Set.empty )
+            ( seed, Set.empty )
         |> Tuple.first
 
 
@@ -638,6 +714,7 @@ subset does.
 hoistedUnionDecls : UnionTable -> { types : List Elm.Declaration, decoders : List Elm.Declaration, encoders : List Elm.Declaration }
 hoistedUnionDecls table =
     Dict.values table
+        |> List.filter (\info -> info.home == Local)
         |> List.map
             (\{ name, kind } ->
                 case kind of
@@ -974,12 +1051,12 @@ decoderExprAttrs table =
     , Ast.onUnion
         (\rawVariants _ ->
             lookupUnion table rawVariants
-                |> Maybe.map (\info -> Elm.val (decoderName info.name))
+                |> Maybe.map infoDecoder
         )
     , Ast.onDiscriminatedUnion
         (\du _ ->
             lookupDiscriminated table du
-                |> Maybe.map (\info -> Elm.val (decoderName info.name))
+                |> Maybe.map infoDecoder
         )
     ]
 
@@ -1043,7 +1120,7 @@ enumRecordDecoder : List String -> Bool -> UnionInfo -> Elm.Expression
 enumRecordDecoder keys optional info =
     let
         valueDecoder =
-            Elm.val (decoderName info.name)
+            infoDecoder info
 
         fieldDecoder key =
             if optional then
@@ -1232,12 +1309,12 @@ encoderExprAttrs table =
     , Ast.onUnion
         (\rawVariants _ ->
             lookupUnion table rawVariants
-                |> Maybe.map (\info -> leafEnc (Elm.val (encoderName info.name)))
+                |> Maybe.map (leafEnc << infoEncoder)
         )
     , Ast.onDiscriminatedUnion
         (\du _ ->
             lookupDiscriminated table du
-                |> Maybe.map (\info -> leafEnc (Elm.val (encoderName info.name)))
+                |> Maybe.map (leafEnc << infoEncoder)
         )
     ]
 
@@ -1296,7 +1373,7 @@ enumRecordEncoder : List String -> Bool -> UnionInfo -> EncoderNode
 enumRecordEncoder keys optional info =
     let
         valueEncoder =
-            Elm.val (encoderName info.name)
+            infoEncoder info
 
         -- the hoisted encoder reference is a leaf; the optional wrapper adds a maybe-case
         height =

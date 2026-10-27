@@ -17,23 +17,30 @@ import Maybe.Extra
 type alias Args =
     { outputModuleNamespace : List String
     , decls : List Ast.Decl
+    , imports : List Builder.Import
     }
 
 
 argsDecoder : D.Decoder Args
 argsDecoder =
-    D.map2 Args
+    D.map3 Args
         (D.field "outputModuleNamespace" <| D.list D.string)
         (D.map Dict.toList <| D.field "decls" <| D.dict Ast.decoder)
+        (D.field "imports" <|
+            D.list <|
+                D.map2 Builder.Import
+                    (D.field "moduleName" <| D.list D.string)
+                    (D.field "value" Ast.decoder)
+        )
 
 
 main : Program Json.Encode.Value () ()
 main =
     Generate.fromJson argsDecoder
-        (\{ outputModuleNamespace, decls } ->
+        (\{ outputModuleNamespace, decls, imports } ->
             let
                 outputs =
-                    List.map (Builder.build outputModuleNamespace) decls
+                    List.map (Builder.build imports outputModuleNamespace) decls
 
                 files =
                     Maybe.Extra.values <|
