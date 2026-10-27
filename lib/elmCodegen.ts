@@ -2,7 +2,6 @@ import z from "zod"
 import * as ElmCodegenCore from "elm-codegen"
 
 export const config = z.object({
-  cleanFirst: z.boolean(),
   cwd: z.string(),
   generatorModulePath: z.string(),
   outdir: z.string(),

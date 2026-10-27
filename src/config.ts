@@ -9,27 +9,18 @@ import * as ElmCodegen from "../lib/elmCodegen.js"
 // schemas) — still find the generator. `src/config.ts` → `..` is the package root.
 export const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
 
-/** this defines a single configuration section; at least one is required for the program to do anything meaningful
- */
+/** one section: generate every zod export of each input file into `relativeOutdir`, under
+ * `outputModuleNamespace` */
 const configParamsSection = z.object({
   relativeInputPaths: z.array(z.string()),
   relativeOutdir: z.string(),
   outputModuleNamespace: z.array(z.string()).optional(),
-  relativePrepareScriptPath: z.string().optional(),
-  ...ElmCodegen.config
-    .pick({
-      cleanFirst: true,
-      debug: true,
-    })
-    .partial().shape,
-  elmCodegenOverrides: ElmCodegen.config.pick({ generatorModulePath: true }).partial().optional(),
+  elmCodegenOverrides: ElmCodegen.config.pick({ generatorModulePath: true, debug: true }).partial().optional(),
 })
 
-/** this is the shape of the program's entry point
- */
+/** what a caller writes; `toConfig` fills in the rest */
 export const configParams = z.object({
   root: z.optional(z.string()),
-  relativeGlobalPrepareScriptPath: z.string().optional(),
   sections: z.record(z.string(), configParamsSection),
 })
 export type ConfigParams = z.infer<typeof configParams>
@@ -43,15 +34,15 @@ export type Config = z.infer<typeof config>
 
 export const toConfig = ({
   root: maybeRoot,
-  relativeGlobalPrepareScriptPath,
   sections,
 }: ConfigParams): Config => {
   const root = maybeRoot ?? "."
   const workdirPath = path.join(root, ".typewriter")
 
   const elmCodegenConfig: ElmCodegen.Config = {
-    cleanFirst: false,
-    debug: false,
+    // elm-codegen's `debug: false` compiles the generator with --optimize, which rejects the
+    // generator's `Debug.log`s — so the generator only builds in debug mode
+    debug: true,
     cwd: path.join(packageRoot, "codegen"),
     generatorModulePath: "GenerateZodBindings.elm",
     outdir: "generated",
@@ -60,7 +51,6 @@ export const toConfig = ({
   return {
     root,
     workdirPath,
-    relativeGlobalPrepareScriptPath,
     sections,
     elmCodegenConfig,
   }

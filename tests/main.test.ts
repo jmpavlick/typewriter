@@ -4,8 +4,8 @@ import z from "zod"
 import * as path from "path"
 import { fileURLToPath } from "url"
 import { type ConfigParams, packageRoot, toConfig } from "../src/config.js"
-import { toElmModuleSegment, toRunPropsEntries, toSerializable } from "../src/main.js"
-import ouroboros from "../src/ouroboros.js"
+import { manifest, toElmModuleSegment, toRunPropsEntries, toSerializable } from "../src/main.js"
+import corpus from "./corpus.config.js"
 
 // the package root, derived the same way config.ts derives it — tests/ → ..
 const packageRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..")
@@ -52,9 +52,26 @@ test("toRunPropsEntries emits one RunProps per (section × input path)", () => {
   assert.equal(entries[0].elmCodegenConfig.outdir, "out/elm")
   assert.deepEqual(entries[0].outputModuleNamespace, ["Api", "Gen"])
   assert.equal(
-    entries[0].debugZodAstOutputPath,
-    path.join("/app", ".typewriter", "a/schemas.json"),
+    entries[0].zodAstOutputPath,
+    path.join("/app", ".typewriter", "models", "a/schemas.json"),
   )
+  assert.equal(
+    entries[0].manifestPath,
+    path.join("/app", ".typewriter", "models", "a/schemas.manifest.json"),
+  )
+})
+
+test("toRunPropsEntries keys the workdir by section, so sections sharing an input don't share a manifest", () => {
+  const entries = toRunPropsEntries(
+    toConfig({
+      root: ".",
+      sections: {
+        a: { relativeInputPaths: ["x.ts"], relativeOutdir: "o" },
+        b: { relativeInputPaths: ["x.ts"], relativeOutdir: "o" },
+      },
+    }),
+  )
+  assert.notEqual(entries[0].manifestPath, entries[1].manifestPath)
 })
 
 test("toRunPropsEntries defaults an absent outputModuleNamespace to []", () => {
@@ -67,27 +84,21 @@ test("toRunPropsEntries defaults an absent outputModuleNamespace to []", () => {
   assert.deepEqual(entries[0].outputModuleNamespace, [])
 })
 
-test("toRunPropsEntries threads cleanFirst/debug overrides into elmCodegenConfig", () => {
+test("toRunPropsEntries threads elmCodegenOverrides into elmCodegenConfig", () => {
   const entries = toRunPropsEntries(
     toConfig({
       root: ".",
       sections: {
-        s: { relativeInputPaths: ["x.ts"], relativeOutdir: "o", cleanFirst: true, debug: true },
+        s: { relativeInputPaths: ["x.ts"], relativeOutdir: "o", elmCodegenOverrides: { debug: true } },
       },
     }),
   )
-  assert.equal(entries[0].elmCodegenConfig.cleanFirst, true)
   assert.equal(entries[0].elmCodegenConfig.debug, true)
 })
 
-test("ouroboros stays a valid config that plans its own self-codegen sections", () => {
-  // the CLI passes ouroboros to runAll explicitly; this guards that ouroboros keeps planning
-  // cleanly (one entry per section) so that contract can't silently rot.
-  const entries = toRunPropsEntries(ouroboros)
-  assert.deepEqual(
-    entries.map((e) => e.label).sort(),
-    ["main", "tests"],
-  )
+test("manifest only admits .elm paths, so a mangled one can't aim the delete elsewhere", () => {
+  assert.equal(manifest.safeParse({ files: ["/out/Locale.elm"] }).success, true)
+  assert.equal(manifest.safeParse({ files: ["/out/elm.json"] }).success, false)
 })
 
 test("toSerializable drops true cycles but keeps shared (DAG) references and all fields", () => {
@@ -120,11 +131,8 @@ test("toSerializable stamps `partial` onto enum-keyed partialRecord defs (zod ke
   assert.equal("partial" in out.stringKeyed.def, false)
 })
 
-test("ouroboros plans absolute, package-rooted paths so runAll is cwd-independent", () => {
-  // a consumer launches runAll from THEIR repo root; ouroboros (always first) must
-  // still resolve its own inputs and write its outputs under typewriter's package
-  // dir — never scattering self-codegen into the caller's tree.
-  for (const e of toRunPropsEntries(ouroboros)) {
+test("the corpus config plans absolute, package-rooted paths so `pnpm generate` is cwd-independent", () => {
+  for (const e of toRunPropsEntries(corpus)) {
     assert.ok(path.isAbsolute(e.inputPath), `input absolute: ${e.inputPath}`)
     assert.ok(e.inputPath.startsWith(packageRoot), `input under packageRoot: ${e.inputPath}`)
     assert.ok(

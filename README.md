@@ -19,31 +19,30 @@ pnpm install
 
 ### Configure
 
-There's no config file to drop in — the configuration lives in code, in [`src/ouroboros.ts`](src/ouroboros.ts).
-It defines a set of **sections**; each section reads one or more `.ts` files and writes Elm into an
-output directory under a module namespace:
+Configuration lives in code: build a config with `toConfig` and hand it to `runAll`. A config is a
+set of **sections**; each section reads one or more `.ts` files and writes Elm into an output
+directory under a module namespace:
 
 ```ts
-const configParams: ConfigParams = {
-  root: ".",
-  sections: {
-    // generate from the example corpus into ./generated/IntegrationTests/*
-    tests: {
-      relativeInputPaths: ["tests/schemaVariants.ts"],
-      relativeOutdir: "generated",
-      outputModuleNamespace: ["IntegrationTests"],
-      cleanFirst: true,
-      debug: true,
+import { toConfig } from "typewriter/src/config"
+import { runAll } from "typewriter/src/main"
+
+await runAll(
+  toConfig({
+    root: ".",
+    sections: {
+      myApp: {
+        relativeInputPaths: ["src/schemas.ts"],
+        relativeOutdir: "elm/generated",
+        outputModuleNamespace: ["Api", "Generated"],
+      },
     },
-    // add your own:
-    myApp: {
-      relativeInputPaths: ["../shepherd/packages/whatever/schemas.ts"],
-      relativeOutdir: "../shepherd/.../generated",
-      outputModuleNamespace: ["Api", "Generated"],
-    },
-  },
-}
+  })
+)
 ```
+
+`root` anchors the input paths; `relativeOutdir` resolves against the cwd you launch from.
+[`tests/corpus.config.ts`](tests/corpus.config.ts) is a working example.
 
 Per-section options:
 
@@ -52,7 +51,7 @@ Per-section options:
 | `relativeInputPaths` | `.ts` files (relative to `root`) whose exported Zod schemas get generated |
 | `relativeOutdir` | where the Elm files are written |
 | `outputModuleNamespace` | module-name prefix, e.g. `["Api", "Generated"]` → `module Api.Generated.User` |
-| `cleanFirst` / `debug` | optional; `debug` dumps the intermediate Zod AST as JSON under `.typewriter/` |
+| `elmCodegenOverrides` | optional; override elm-codegen's `generatorModulePath` / `debug` |
 
 The input file just needs to `export` Zod schemas — anything that's a `ZodType` is picked up;
 everything else is ignored.
@@ -63,8 +62,12 @@ everything else is ignored.
 pnpm generate
 ```
 
-Each run wipes and rewrites each section's output directory, so deleting a schema removes its
-module too. Output for one schema looks like:
+Output directories can be shared — with other sections, other configs, or hand-written Elm — so a
+run never wipes one. Instead each run records the files it wrote in a manifest under
+`.typewriter/<section>/` (next to the intermediate Zod AST dump), and the next run deletes exactly
+those before regenerating. Deleting a schema removes its module; anything typewriter didn't write is
+left alone. With no manifest (first run, fresh clone — `.typewriter/` is gitignored) nothing is
+deleted, only overwritten. Output for one schema looks like:
 
 ```elm
 -- export const user = z.object({ id: z.string(), role: z.enum(["admin", "user"]) })
@@ -138,10 +141,12 @@ for the supported-construct list above.
 
 | path | what |
 |------|------|
-| `index.ts` | entry point — builds run-props from the config and runs each section |
-| `src/ouroboros.ts` | **the config** — sections, input/output paths |
+| `index.ts` | `pnpm generate` — runs the corpus config |
+| `src/config.ts` | config schema + `toConfig` |
+| `src/main.ts` | `runAll`: per-section run, manifest-scoped cleanup, safety-net checks |
 | `src/astify.ts` | loads a `.ts` module and extracts its Zod schemas |
 | `src/Ast.elm` | the typed AST + its JSON decoder (the Zod wire format → `Ast.Value`) |
 | `src/Builder.elm` | `Ast.Value` → Elm type + decoder, via [elm-codegen](https://github.com/mdgriffith/elm-codegen) |
 | `codegen/GenerateZodBindings.elm` | the elm-codegen entry that drives `Builder` |
 | `tests/schemaVariants.ts` | example corpus / integration fixture |
+| `tests/corpus.config.ts` | the config that generates the corpus into `generated/IntegrationTests/` |

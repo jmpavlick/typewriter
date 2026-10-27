@@ -1,14 +1,11 @@
 #!/usr/bin/env node
 import { runAll } from "./src/main.js"
-import ouroboros from "./src/ouroboros.js"
+import corpus from "./tests/corpus.config.js"
 
-// typewriter generating its own bindings: the CLI is the ouroboros path — it
-// regenerates typewriter's own Elm bindings (platformWorkerConfig/, generated/).
-// callers that want to generate from their own schemas import { runAll } and pass
-// their config(s); runAll no longer self-gens, so consumer runs never write inside
-// this package — see src/main.ts.
+// `pnpm generate`: regenerate the example corpus. real callers import { toConfig } and { runAll }
+// and pass their own config.
 try {
-  await runAll(ouroboros)
+  await runAll(corpus)
 } catch (err) {
   // runAll throws AggregateError when one or more sections fail; surface each, then
   // exit non-zero so the failure can't pass silently.

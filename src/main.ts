@@ -99,26 +99,47 @@ export const runProps = z.object({
   inputPath: z.string(),
   outputModuleNamespace: z.array(z.string()),
   elmCodegenConfig: ElmCodegen.config,
-  debugZodAstOutputPath: z.string(),
+  zodAstOutputPath: z.string(),
+  manifestPath: z.string(),
 })
 export type RunProps = z.infer<typeof runProps>
+
+/** the files one run (section × input path) wrote, as absolute paths. outdirs are shared — other
+ * sections, other configs, and hand-written modules can live beside ours — so the next run deletes
+ * exactly these, never the whole directory. `.elm` only, so a mangled manifest can't aim the delete
+ * anywhere else. */
+export const manifest = z.object({
+  files: z.array(z.string().endsWith(".elm")),
+})
+export type Manifest = z.infer<typeof manifest>
+
+/** the previous run's manifest, or none on a first run (or a fresh clone — `.typewriter/` is
+ * gitignored, so a schema deleted before then leaves its module behind) */
+const readManifest = async (manifestPath: string): Promise<Manifest> => {
+  if (!(await fs.exists(manifestPath))) return { files: [] }
+  return manifest.parse(JSON.parse(await fs.readFile(manifestPath)))
+}
 
 export const run = async ({
   label,
   inputPath,
   elmCodegenConfig,
-  debugZodAstOutputPath,
+  zodAstOutputPath,
+  manifestPath,
   outputModuleNamespace,
 }: RunProps): Promise<void> => {
-  const namespaceOutdir = path.join(elmCodegenConfig.outdir, ...outputModuleNamespace)
-  const errorModulePath = path.join(namespaceOutdir, `${ERROR_MODULE_NAME}.elm`)
+  const errorModulePath = path.resolve(
+    elmCodegenConfig.outdir,
+    ...outputModuleNamespace,
+    `${ERROR_MODULE_NAME}.elm`
+  )
 
   console.log(`section: ${label}\ninput: ${inputPath}`)
 
   const decls = await Astify.execute(inputPath)
   const modulePaths = Object.keys(decls).map(
     (name) =>
-      path.join(
+      path.resolve(
         elmCodegenConfig.outdir,
         ...[...outputModuleNamespace, name].map(toElmModuleSegment)
       ) + ".elm"
@@ -129,16 +150,24 @@ export const run = async ({
   // structural fields, all of which survive this.
   const serializableDecls = toSerializable(decls)
 
-  if (elmCodegenConfig.debug) {
-    await fs.writeFileUtf8(debugZodAstOutputPath, JSON.stringify(serializableDecls, null, 2), {
-      overwrite: true,
-      mkdirP: true,
-    })
-  }
+  await fs.writeFileUtf8(zodAstOutputPath, JSON.stringify(serializableDecls, null, 2), {
+    overwrite: true,
+    mkdirP: true,
+  })
 
-  // wipe this section's output dir first so deleted schemas don't leave stale modules (and the
-  // post-run check only sees this run's output)
-  await fs.rm(namespaceOutdir, { recursive: true, force: true })
+  // delete what the last run wrote (so deleted schemas don't leave stale modules) plus what this
+  // run is about to write (so the post-run checks only see this run's output). the manifest is
+  // written BEFORE generating, so a run that dies halfway still gets cleaned up by the next one.
+  const previous = await readManifest(manifestPath)
+  const owned = [...modulePaths, errorModulePath]
+  await Promise.all(
+    [...new Set([...previous.files, ...owned])].map((p) => fs.rm(p, { force: true }))
+  )
+  await fs.writeFileUtf8(manifestPath, JSON.stringify({ files: owned } satisfies Manifest, null, 2), {
+    overwrite: true,
+    mkdirP: true,
+  })
+
   await ElmCodegen.execute(elmCodegenConfig)({ outputModuleNamespace, decls: serializableDecls })
   await assertNoErrorModule(errorModulePath, label)
   await assertModulesGenerated(modulePaths, label)
@@ -158,34 +187,26 @@ export const toRunPropsEntries = ({
 
   const fromSection = ([
     label,
-    {
-      relativeInputPaths,
-      relativeOutdir,
-      cleanFirst,
-      debug,
-      elmCodegenOverrides,
-      outputModuleNamespace,
-    },
+    { relativeInputPaths, relativeOutdir, elmCodegenOverrides, outputModuleNamespace },
   ]: [string, Config["sections"][number]]): RunProps[] => {
     const elmCodegenConfig: ElmCodegen.Config = {
       ...globalElmCodegenConfig,
       outdir: relativeOutdir,
-      ...(cleanFirst === undefined ? {} : { cleanFirst }),
-      ...(debug === undefined ? {} : { debug }),
       ...{ ...elmCodegenOverrides },
     }
 
     return relativeInputPaths.map((rip) => {
       const inputPath = path.join(absoluteRoot, rip)
-      const relativeWithoutExt = rip.replace(/\.[^.]+$/, "")
-      const debugZodAstOutputPath = path.join(workdirPath, `${relativeWithoutExt}.json`)
+      // keyed by section too: two sections reading the same input must not share a manifest
+      const runWorkdir = path.join(workdirPath, label, rip.replace(/\.[^.]+$/, ""))
 
       return {
         label,
         inputPath,
         outputModuleNamespace: outputModuleNamespace ?? [],
         elmCodegenConfig,
-        debugZodAstOutputPath,
+        zodAstOutputPath: `${runWorkdir}.json`,
+        manifestPath: `${runWorkdir}.manifest.json`,
       }
     })
   }
@@ -219,14 +240,8 @@ const elmFormat = async (entries: RunProps[]): Promise<void> => {
   }
 }
 
-/** the full pipeline: each passed-in config runs in order, to completion. the
- * generator compiles against typewriter's OWN Elm bindings (platformWorkerConfig/,
- * generated/) — those are regenerated by the ouroboros config, which the CLI
- * (index.ts) passes explicitly; library callers get the source-controlled bindings
- * as-committed, so a consumer run never writes inside the typewriter package
- * (which would retrigger any file-watcher-driven build graph — e.g. turbo watch).
- * throws an `AggregateError` on any section failure; the CLI turns that into a
- * non-zero exit. */
+/** the full pipeline: each config runs in order, to completion. throws an `AggregateError` on
+ * any section failure; the CLI turns that into a non-zero exit. */
 export const runAll = async (...configs: Config[]): Promise<void> => {
   for (const config of configs) {
     const entries = toRunPropsEntries(config)
